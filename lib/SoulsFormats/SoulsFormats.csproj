@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    SoulsFormatsNEXT (external/SoulsFormatsNEXT, a git submodule; GPL-3.0) built for .NET 6.
+    Upstream's project targets net9.0 and this repository builds with the .NET 6 SDK, so its
+    sources are compiled here with the same package references as upstream's SoulsFormats.csproj.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>SoulsFormats</AssemblyName>
+    <RootNamespace>SoulsFormats</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DebugType>none</DebugType>
+    <NoWarn>$(NoWarn);CS1591;CS0618;CS0612;SYSLIB0021</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\external\SoulsFormatsNEXT\SoulsFormats\**\*.cs" Exclude="..\..\external\SoulsFormatsNEXT\SoulsFormats\obj\**;..\..\external\SoulsFormatsNEXT\SoulsFormats\bin\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+    <PackageReference Include="DrSwizzler" Version="1.1.1" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+    <PackageReference Include="ZstdNet" Version="1.4.5" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+{
+  "name": "dsr-texture-editor-web-libs",
+  "private": true,
+  "description": "Pins the browser libraries and copies the modules the editor imports into src/wwwroot/vendor (node vendor.mjs).",
+  "type": "module",
+  "scripts": { "vendor": "node vendor.mjs" },
+  "devDependencies": {
+    "esbuild": "0.25.5",
+    "three": "0.186.1",
+    "three-gpu-pathtracer": "0.0.26",
+    "three-mesh-bvh": "0.9.15"
+  }
+}
