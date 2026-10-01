@@ -5,6 +5,8 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+permissions:
+  contents: write   # the release step attaches the exe
 jobs:
   windows:
     runs-on: windows-latest
