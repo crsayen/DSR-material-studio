@@ -59,7 +59,7 @@ object State() => new
     game = new { folder = GameFolder(), ok = GameFiles.LooksLikeGame(GameFolder()), useMods = UseMods(), searchOrder = files.Roots, fromProject = project != null },
     defaultGame = new { folder = settings.GameFolder, useMods = settings.UseMods },
     project = project?.Summary(),
-    recent = settings.RecentProjects.Where(Project.Exists).Take(8),
+    recent = settings.RecentProjects.Select(Project.Peek).Where(r => r != null).OrderByDescending(r => ((dynamic)r).modified).Take(12),   // most recently edited first
     native = Window.Active,   // native folder dialogs are available
 };
 app.MapGet("/api/state", () => Results.Json(State()));

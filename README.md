@@ -64,7 +64,8 @@ Edits live in a **project**: a folder you choose (there is no default). **New…
 
 The project file records the game folder, the models you opened (the Project panel lists them;
 opening a project reopens the last one) and every edited texture's layers, saved as you change
-them. **Open…** offers recent projects or browses for a folder with a project file. Changing the
+them. **Open…** lists recent projects, most recently edited first, with their last edit time and
+texture counts, or browses for a folder with a project file. Changing the
 game folder while a project is open changes that project's install.
 
 **Export** writes the edited texture into the project folder as an uncompressed RGBA8 DDS with

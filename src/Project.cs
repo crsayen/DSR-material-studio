@@ -24,6 +24,26 @@ namespace TextureEditor
         static string FileIn(string folder) => string.IsNullOrEmpty(folder) ? null : FileNames.Select(n => Path.Combine(folder, n)).FirstOrDefault(File.Exists);
         public static bool Exists(string folder) => FileIn(folder) != null;
 
+        // What the recents list shows, read from the project file without opening it.
+        public static object Peek(string folder)
+        {
+            try
+            {
+                var file = FileIn(folder); if (file == null) return null;
+                var doc = JsonNode.Parse(File.ReadAllText(file)) as JsonObject; if (doc == null) return null;
+                var modified = (string)doc["modified"] ?? (string)doc["created"];
+                if (!DateTime.TryParse(modified, out var when)) when = File.GetLastWriteTime(file);
+                var textures = doc["textures"] as JsonObject;
+                return new
+                {
+                    folder = Path.GetFullPath(folder), name = Path.GetFileName(folder.TrimEnd('\\', '/')), modified = when,
+                    game = (string)doc["game"]?["folder"],
+                    textures = textures?.Count ?? 0, exported = textures?.Count(kv => kv.Value?["exported"] != null) ?? 0,
+                };
+            }
+            catch { return null; }
+        }
+
         public static Project Create(string folder, string gameFolder, bool useMods)
         {
             folder = Path.GetFullPath(folder);

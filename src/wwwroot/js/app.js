@@ -722,6 +722,15 @@ $('revertGame').onclick = async () => {
 };
 
 // ------------------------------------------------------------------ project and game folder
+// "3 minutes ago", "yesterday", or the date.
+function ago(iso) {
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) { const m = Math.round(s / 60); return `${m} minute${m === 1 ? '' : 's'} ago`; }
+  if (s < 86400) { const h = Math.round(s / 3600); return `${h} hour${h === 1 ? '' : 's'} ago`; }
+  const d = Math.round(s / 86400);
+  return d === 1 ? 'yesterday' : d < 14 ? `${d} days ago` : new Date(iso).toLocaleDateString();
+}
 async function refreshState() {
   S.state = await (await api('/api/state')).json();
   const st = S.state, p = st.project;
@@ -786,12 +795,18 @@ async function openProject(folder) {
 }
 $('openProject').onclick = () => {
   const ul = $('recentProjects'); ul.innerHTML = '';
-  for (const f of S.state.recent) { const li = document.createElement('li'); li.textContent = f; li.onclick = () => openProject(f); ul.appendChild(li); }
+  for (const r of S.state.recent) {
+    const li = document.createElement('li'); li.className = 'recent';
+    li.innerHTML = `<div class="row between"><b>${escapeHtml(r.name)}</b><span class="dim small">${escapeHtml(ago(r.modified))}</span></div>`
+      + `<div class="small dim">${r.textures} texture${r.textures === 1 ? '' : 's'} edited, ${r.exported} exported</div><div class="path small">${escapeHtml(r.folder)}</div>`;
+    li.title = `Last edited ${new Date(r.modified).toLocaleString()}\nGame: ${r.game ?? '?'}`;
+    li.onclick = () => openProject(r.folder); ul.appendChild(li);
+  }
   if (!S.state.recent.length) ul.innerHTML = '<li class="dim">No recent projects.</li>';
   $('openProjectDialog').showModal();
 };
 $('opCancel').onclick = () => $('openProjectDialog').close();
-$('opBrowse').onclick = async () => { const f = await pickFolder({ title: 'Project folder (with texture-editor.project.json)', start: S.state.recent[0] || '', want: 'project' }); if (f) openProject(f); };
+$('opBrowse').onclick = async () => { const f = await pickFolder({ title: 'Project folder (with texture-editor.project.json)', start: S.state.recent[0]?.folder || '', want: 'project' }); if (f) openProject(f); };
 
 // want: 'game' (a game install), 'project' (has a project file), 'newProject' (no project file yet).
 // In the app's window this is the system's folder dialog; in a browser (--serve) the page's own
