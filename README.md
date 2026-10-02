@@ -79,6 +79,11 @@ undo (Ctrl+Z, Ctrl+Y).
   **Assign another…** points the material at any definition. Both are recorded per model in the
   project and applied to the FLVER on export.
 - **Revert to game's** drops the project's changes; a new definition can be deleted.
+- **Emission** makes the material glow with its own diffuse colour, in the viewer (the path
+  tracer treats it as a light) and for mods that support it. It is a tag in `g_SpecularPower`,
+  a parameter the PBL shaders leave unused but the game keeps in a per-draw constant:
+  `252 + n/64` with n = 1..63 means radiance = n/4 times the linear diffuse colour. The
+  unmodified game ignores it; a mod's shaders and tracer can read it from the constant.
 
 **Export to game…** then also writes `mtd\Mtd.mtdbnd.dcx` (the game's bundle with the project's
 definitions merged in, new ones appended; `MtdPatch.mtdbnd.dcx` too when it holds an edited one)

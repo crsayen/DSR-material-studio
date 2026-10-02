@@ -15,6 +15,19 @@
 // specularColorMap with specularColor = 5 (0.04 x 5 = 0.2, the top of B/5).
 import * as THREE from 'three';
 
+// Per-material emission, as a tag in g_SpecularPower (unused by the PBL shaders; the game keeps it
+// in a per-draw constant that mods can read): value = 252 + level/64, level 1..63, meaning the
+// surface emits its linear diffuse colour times level/4 (0.25 .. 15.75). Exact in float32.
+export const EMISSION_TAG_BASE = 252, EMISSION_LEVELS = 63, EMISSION_STEP = 0.25;
+export function emissionLevel(specularPower) {
+  const v = Number(specularPower);
+  if (!(v >= EMISSION_TAG_BASE && v < EMISSION_TAG_BASE + 1)) return 0;
+  const level = Math.round((v - EMISSION_TAG_BASE) * 64);
+  return Math.abs(v - (EMISSION_TAG_BASE + level / 64)) < 1e-6 && level >= 1 && level <= EMISSION_LEVELS ? level : 0;
+}
+export const emissionTag = (level) => EMISSION_TAG_BASE + level / 64;
+export const emissionStrength = (level) => level * EMISSION_STEP;
+
 export function mtdParams(material) {
   const p = material.params || {};
   const vec = (v, d) => Array.isArray(v) ? v.map(Number) : d;
@@ -26,6 +39,7 @@ export function mtdParams(material) {
     difMul: difColor.map(c => c * difPower),
     spcMul: spcColor.map(c => c * spcPower),
     alphaTest: (p.g_BlendMode ?? 0) === 1 || /_Alp|_Edge/i.test(material.mtd || ''),
+    emission: emissionStrength(emissionLevel(p.g_SpecularPower)),   // radiance = emission x linear diffuse colour
   };
 }
 

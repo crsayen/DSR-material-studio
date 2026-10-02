@@ -4,6 +4,8 @@
 // slots. Edits are saved to the project as they change (one definition per MTD file name), with
 // undo; a model's material can also be pointed at another definition, or at a new copy.
 
+import { emissionLevel, emissionTag, emissionStrength, EMISSION_LEVELS, EMISSION_STEP } from './material.js';
+
 const $ = (id) => document.getElementById(id);
 
 // What the parameters mean (the HemEnv family's, as far as known); `preview` marks the ones the
@@ -15,7 +17,7 @@ const PARAM_INFO = {
   g_DiffuseMapColorPower: { info: 'Scales g_DiffuseMapColor', preview: true },
   g_SpecularMapColor: { info: 'Multiplies the specular map (times g_SpecularMapColorPower); in the metalness workflow its luminance scales the non-metal reflectance', preview: true },
   g_SpecularMapColorPower: { info: 'Scales g_SpecularMapColor', preview: true },
-  g_SpecularPower: { info: 'Specular exponent of the old lighting model; the PBL shader keeps it in a constant (c11.x) that some mods use as a per-material tag' },
+  g_SpecularPower: { info: 'Specular exponent of the old lighting model, unused by the PBL shaders; the game keeps it in a per-draw constant, so it carries per-material tags for mods: 252 + n/64 is the emission tag (see Emission above)' },
   g_MaterialWorkflow: { info: '0 metalness: specular map R roughness, G metalness, B non-metal reflectance, A light power. 1 specular: RGB specular colour, A roughness. Absent = 0', preview: true },
   g_EnvSpcSlotNo: { info: 'Which environment reflection slot the material samples' },
   g_TexScrollType: { info: 'UV scrolling mode (0 none)' }, g_TexScroll_0: { info: 'UV scroll speed, set 0' }, g_TexScroll_1: { info: 'UV scroll speed, set 1' }, g_TexScroll_2: { info: 'UV scroll speed, set 2' },
@@ -73,8 +75,28 @@ export function initMaterialEditor(ctx) {
     sel.value = d.shaderPath;
     sel.onchange = () => { d.shaderPath = sel.value; changed(); };
     $('mtdDesc').value = d.description || ''; $('mtdDesc').oninput = () => { d.description = $('mtdDesc').value; changed(false); };
-    renderParams(); renderTextures();
+    renderEmission(); renderParams(); renderTextures();
   }
+  // ---- emission: a tag in g_SpecularPower, for mods that light emissive materials ----
+  const specPower = (d) => d.params.find(p => p.name === 'g_SpecularPower');
+  function renderEmission() {
+    const d = M.def, level = emissionLevel(specPower(d)?.value);
+    $('mtdEmission').value = level; $('mtdEmissionNum').value = emissionStrength(level);
+    $('mtdEmissionOut').textContent = level ? `x ${emissionStrength(level)} of the diffuse colour (tag ${emissionTag(level)})` : 'none';
+  }
+  function setEmission(level, commit) {
+    level = Math.max(0, Math.min(EMISSION_LEVELS, Math.round(level)));
+    const d = M.def; let p = specPower(d);
+    if (level > 0) { if (!p) { p = { name: 'g_SpecularPower', type: 'Float', value: 0 }; d.params.push(p); } p.value = emissionTag(level); }
+    else if (p) {   // back to what the parameter was before the tag
+      const orig = (d.original?.params || []).find(x => x.name === 'g_SpecularPower') ?? (family(d)?.params || []).find(x => x.name === 'g_SpecularPower');
+      if (orig) p.value = orig.value; else d.params.splice(d.params.indexOf(p), 1);
+    }
+    renderEmission(); if (commit) changed(); else { recordHistory(true); renderParams(); schedule(); preview(); }
+  }
+  $('mtdEmission').oninput = () => setEmission(+$('mtdEmission').value, false);
+  $('mtdEmission').onchange = () => setEmission(+$('mtdEmission').value, true);
+  $('mtdEmissionNum').onchange = () => setEmission((+$('mtdEmissionNum').value || 0) / EMISSION_STEP, true);
   function renderParams() {
     const d = M.def, box = $('mtdParams'); box.innerHTML = '';
     const fam = family(d);
@@ -83,6 +105,7 @@ export function initMaterialEditor(ctx) {
       const info = PARAM_INFO[p.name];
       const name = el('div', { cls: 'pname', title: (info?.info || '') + (info?.preview ? '\nShown in the viewer.' : '\nNo effect in the viewer (the game uses it).') }, p.name);
       if (info?.preview) name.append(el('span', { cls: 'badge' }, 'preview'));
+      if (p.name === 'g_SpecularPower' && emissionLevel(p.value)) name.append(el('span', { cls: 'badge', title: 'This value is the emission tag' }, 'emission'));
       name.append(el('span', { cls: 'dim small' }, ' ' + p.type.toLowerCase()));
       const del = el('button', { title: 'Remove this parameter' }, '✕'); del.onclick = () => { d.params.splice(i, 1); changed(); };
       row.append(name, valueEditor(p, () => changed(false), () => changed()), del);

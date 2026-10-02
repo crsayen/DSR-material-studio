@@ -287,10 +287,17 @@ function rebake(g, changed = null) {
 }
 
 // The selected layer's region, magenta, on the model.
+// The material's own emission (the MTD's emission tag): the diffuse colour map times its strength,
+// which the path tracer treats as a light. The mask overlay borrows the same channel while shown.
+function applyEmission(g) {
+  const m = g.material, e = g.prm.emission > 0, map = e ? g.maps.base : null;
+  if (m.emissiveMap !== map) { m.emissiveMap = map; m.needsUpdate = true; }
+  m.emissive.set(e ? 0xffffff : 0x000000); m.emissiveIntensity = e ? g.prm.emission : 0;
+}
 function updateMaskOverlay(g) {
   const t = S.editing, m = g.material;
   const on = S.showMask && t && t.mask && (g.tex.albedo === t || g.tex.spec === t || g.tex.normal === t);
-  if (!on) { if (m.emissiveMap) { m.emissiveMap = null; m.emissiveIntensity = 0; m.needsUpdate = true; } return; }
+  if (!on) { applyEmission(g); return; }
   const px = new Uint8ClampedArray(t.width * t.height * 4);
   for (let i = 0; i < t.mask.length; i++) { const v = t.mask[i] * 255; px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v; px[i * 4 + 3] = 255; }
   g.maps.mask = refresh(g.maps.mask, { pixels: px, width: t.width, height: t.height }, false);

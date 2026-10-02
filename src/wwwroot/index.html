@@ -120,6 +120,8 @@
         <div class="grid wide">
           <label>Shader family</label><select id="mtdFamily"></select>
           <label>Description</label><input id="mtdDesc" type="text">
+          <label title="How strongly the surface glows with its own diffuse colour. A per-material tag (g_SpecularPower = 252 + n/64) that mods supporting it light; the unmodified game ignores it.">Emission</label><div class="row"><input id="mtdEmission" type="range" min="0" max="63" step="1"><input id="mtdEmissionNum" type="number" class="num" min="0" max="15.75" step="0.25"></div>
+          <span></span><div id="mtdEmissionOut" class="small dim"></div>
         </div>
       </section>
       <section>
