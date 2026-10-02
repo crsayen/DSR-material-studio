@@ -1,4 +1,4 @@
-// A project: one folder holding texture-editor.project.json (the game install it edits, the models
+// A project: one folder holding material-studio.project.json (the game install it edits, the models
 // opened, every edited texture's layers) and the exported textures as <content id>.dds.
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -12,9 +12,9 @@ namespace TextureEditor
 
     class Project
     {
-        public const string FileName = "texture-editor.project.json";
-        // Projects made by the app under its earlier name keep their file name.
-        static readonly string[] FileNames = { FileName, "texture-studio.project.json" };
+        public const string FileName = "material-studio.project.json";
+        // Projects made by the app under its earlier names keep their file name.
+        static readonly string[] FileNames = { FileName, "texture-editor.project.json", "texture-studio.project.json" };
         public readonly string Folder;
         readonly string filePath;
         readonly JsonObject doc;
@@ -67,7 +67,7 @@ namespace TextureEditor
             if (File.Exists(folder) && FileNames.Contains(Path.GetFileName(folder), StringComparer.OrdinalIgnoreCase)) folder = Path.GetDirectoryName(folder);
             var file = FileIn(folder) ?? throw new Exception($"{folder} has no {FileName}");
             var doc = JsonNode.Parse(File.ReadAllText(file)) as JsonObject ?? throw new Exception("Not a project file");
-            if ((string)doc["format"] != "dsr-texture-studio-project") throw new Exception("Not a DSR Texture Editor project file");
+            if ((string)doc["format"] != "dsr-texture-studio-project") throw new Exception("Not a DSR Material Studio project file");
             doc["models"] ??= new JsonArray(); doc["textures"] ??= new JsonObject();
             doc["materials"] ??= new JsonObject(); doc["assignments"] ??= new JsonObject();
             if (doc["game"] == null) doc["game"] = new JsonObject { ["folder"] = (string)doc["gameFolder"], ["useMods"] = true };

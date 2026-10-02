@@ -1,4 +1,4 @@
-// Per-user settings: %APPDATA%\DSR Texture Editor\settings.json (the default game folder, recent
+// Per-user settings: %APPDATA%\DSR Material Studio\settings.json (the default game folder, recent
 // projects, the window's last position).
 using System.Text.Json;
 
@@ -16,14 +16,14 @@ namespace TextureEditor
         public string FxcPath { get; set; }        // the shader compiler; null = the newest installed Windows SDK's
         public string ShaderSource { get; set; }   // the HLSL source folder, when no project is open
 
-        public static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DSR Texture Editor");
+        public static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DSR Material Studio");
         static string FilePath => Path.Combine(Folder, "settings.json");
-        // The app's earlier name; its settings are taken over once.
-        static string OldFilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DSR Texture Studio", "settings.json");
+        // The app's earlier names; their settings are taken over once.
+        static IEnumerable<string> OldFilePaths => new[] { "DSR Texture Editor", "DSR Texture Studio" }.Select(n => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), n, "settings.json"));
 
         public static Settings Load()
         {
-            foreach (var p in new[] { FilePath, OldFilePath })
+            foreach (var p in new[] { FilePath }.Concat(OldFilePaths))
                 try { if (File.Exists(p)) return JsonSerializer.Deserialize<Settings>(File.ReadAllText(p)) ?? new(); } catch { }
             return new Settings();
         }

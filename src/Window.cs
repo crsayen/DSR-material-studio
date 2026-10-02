@@ -18,7 +18,7 @@ namespace TextureEditor
             Application.EnableVisualStyles();
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.SetCompatibleTextRenderingDefault(false);
-            var f = new Form { Text = "DSR Texture Editor", StartPosition = FormStartPosition.CenterScreen };
+            var f = new Form { Text = "DSR Material Studio", StartPosition = FormStartPosition.CenterScreen };
             try { f.Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath); } catch { }
             // The page is laid out to fit the window without scrolling down to about 1100 x 760 CSS pixels,
             // so the window cannot shrink below that (in device pixels at the monitor's scale).
@@ -45,7 +45,7 @@ namespace TextureEditor
                 try
                 {
                     // The browser's profile (cache, local storage) in the user's profile, not beside the exe.
-                    var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DSR Texture Editor", "WebView2"));
+                    var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DSR Material Studio", "WebView2"));
                     await view.EnsureCoreWebView2Async(env);
                     var core = view.CoreWebView2;
                     core.Settings.IsStatusBarEnabled = false;
@@ -56,11 +56,11 @@ namespace TextureEditor
                 catch (WebView2RuntimeNotFoundException)
                 {
                     const string link = "https://developer.microsoft.com/microsoft-edge/webview2/";
-                    if (MessageBox.Show(f, "DSR Texture Editor needs the Microsoft Edge WebView2 Runtime, which this Windows does not have.\n\nOpen its download page?", "WebView2 Runtime missing", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
+                    if (MessageBox.Show(f, "DSR Material Studio needs the Microsoft Edge WebView2 Runtime, which this Windows does not have.\n\nOpen its download page?", "WebView2 Runtime missing", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
                         try { Process.Start(new ProcessStartInfo(link) { UseShellExecute = true }); } catch { }
                     f.Close();
                 }
-                catch (Exception e) { MessageBox.Show(f, e.ToString(), "DSR Texture Editor could not start", MessageBoxButtons.OK, MessageBoxIcon.Error); f.Close(); }
+                catch (Exception e) { MessageBox.Show(f, e.ToString(), "DSR Material Studio could not start", MessageBoxButtons.OK, MessageBoxIcon.Error); f.Close(); }
             };
             f.FormClosing += (_, _) => SaveBounds(f, settings);
             form = f;

@@ -21,11 +21,11 @@ jobs:
         run: powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: DSR-texture-editor
-          path: dist/DSR-texture-editor.exe
+          name: DSR-material-studio
+          path: dist/DSR-material-studio.exe
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/DSR-texture-editor.exe
+          files: dist/DSR-material-studio.exe
           generate_release_notes: true

@@ -1,4 +1,4 @@
-// DSR Texture Editor: edit Dark Souls Remastered's textures on their models, shaded with the game's
+// DSR Material Studio: edit Dark Souls Remastered's textures on their models, shaded with the game's
 // own material model (FRPG_FS_HemEnv.fx PackMaterial), with parametric, non-destructive layers.
 //
 // The app is a web page (wwwroot: three.js + three-gpu-pathtracer) over a small ASP.NET Core server
@@ -7,12 +7,12 @@
 //
 // Import: the game folder (found through Steam, changeable), read through the ModEngine2 mods it
 // enables when there are any. Export: a project folder the user picks. It holds
-// texture-editor.project.json (every edited texture's layers, saved as they change) and the
+// material-studio.project.json (every edited texture's layers, saved as they change) and the
 // exported textures as <content id>.dds, the DSR lighting mod's runtime texture override format:
 // a project made in that mod's texture_overrides\game folder is live in game.
 //
-//   DSR-texture-editor.exe [--game <game dir>]                 the window
-//   DSR-texture-editor.exe --serve [--port 5199] [--game ...]  no window: the page in a browser
+//   DSR-material-studio.exe [--game <game dir>]                 the window
+//   DSR-material-studio.exe --serve [--port 5199] [--game ...]  no window: the page in a browser
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -43,7 +43,7 @@ GameFiles files = new GameFiles(GameFolder(), UseMods());
 // The page: from the source tree when run from it (edits show on reload), else embedded in the exe.
 IFileProvider web = null;
 for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null && web == null; dir = dir.Parent)
-    if (File.Exists(Path.Combine(dir.FullName, "wwwroot", "js", "app.js")) && File.Exists(Path.Combine(dir.FullName, "DSR-texture-editor.csproj")))
+    if (File.Exists(Path.Combine(dir.FullName, "wwwroot", "js", "app.js")) && File.Exists(Path.Combine(dir.FullName, "DSR-material-studio.csproj")))
         web = new PhysicalFileProvider(Path.Combine(dir.FullName, "wwwroot"));
 web ??= new ManifestEmbeddedFileProvider(typeof(Project).Assembly, "wwwroot");
 
@@ -263,7 +263,7 @@ app.MapPost("/api/export/game", (string model, string target) =>
 
 await app.StartAsync();
 var url = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.First().TrimEnd('/') + "/";
-Console.WriteLine($"game {GameFolder()}\nsearch order: {string.Join(" > ", files.Roots)}\nproject {project?.Folder ?? "(none)"}\nDSR Texture Editor: {url}");
+Console.WriteLine($"game {GameFolder()}\nsearch order: {string.Join(" > ", files.Roots)}\nproject {project?.Folder ?? "(none)"}\nDSR Material Studio: {url}");
 if (serve) await app.WaitForShutdownAsync();
 else
 {

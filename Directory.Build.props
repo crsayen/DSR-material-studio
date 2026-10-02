@@ -2,7 +2,7 @@
   <PropertyGroup>
     <Deterministic>true</Deterministic>
     <!-- Keep the build machine's paths out of the binaries and stack traces. -->
-    <PathMap>$(MSBuildThisFileDirectory)=/DSR-texture-editor/</PathMap>
+    <PathMap>$(MSBuildThisFileDirectory)=/DSR-material-studio/</PathMap>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 </Project>

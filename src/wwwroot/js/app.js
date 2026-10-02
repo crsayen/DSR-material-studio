@@ -1025,7 +1025,7 @@ $('openProject').onclick = () => {
   $('openProjectDialog').showModal();
 };
 $('opCancel').onclick = () => $('openProjectDialog').close();
-$('opBrowse').onclick = async () => { const f = await pickFolder({ title: 'Project folder (with texture-editor.project.json)', start: S.state.recent[0]?.folder || '', want: 'project' }); if (f) openProject(f); };
+$('opBrowse').onclick = async () => { const f = await pickFolder({ title: 'Project folder (with material-studio.project.json)', start: S.state.recent[0]?.folder || '', want: 'project' }); if (f) openProject(f); };
 
 // want: 'game' (a game install), 'project' (has a project file), 'newProject' (no project file yet).
 // In the app's window this is the system's folder dialog; in a browser (--serve) the page's own
@@ -1036,7 +1036,7 @@ async function pickFolder({ title, start, want }) {
   if (!r.path) return null;
   const info = await (await api('/api/fs/list?path=' + encodeURIComponent(r.path))).json();
   if (want === 'game' && !info.isGame) { alert(`${r.path}\n\nis not a Dark Souls Remastered folder (no DarkSoulsRemastered.exe).`); return null; }
-  if (want === 'project' && !info.hasProject) { alert(`${r.path}\n\nhas no project file (texture-editor.project.json).`); return null; }
+  if (want === 'project' && !info.hasProject) { alert(`${r.path}\n\nhas no project file (material-studio.project.json).`); return null; }
   if (want === 'newProject' && info.hasProject) { alert(`${r.path}\n\nalready has a project: use Open… instead.`); return null; }
   return r.path;
 }
@@ -1044,7 +1044,7 @@ function browseFolder({ title, start, want }) {
   return new Promise((resolve) => {
     const dlg = $('folderDialog'); $('fdTitle').textContent = title;
     let cur = null;
-    const hints = { game: 'Pick the folder with DarkSoulsRemastered.exe.', project: 'Pick a folder with texture-editor.project.json.', newProject: 'Pick an empty folder, or make one with New folder.' };
+    const hints = { game: 'Pick the folder with DarkSoulsRemastered.exe.', project: 'Pick a folder with material-studio.project.json.', newProject: 'Pick an empty folder, or make one with New folder.' };
     $('fdHint').textContent = hints[want] || '';
     const show = async (path) => {
       cur = await (await api('/api/fs/list?path=' + encodeURIComponent(path || ''))).json();

@@ -1,12 +1,12 @@
-# DSR Texture Editor
+# DSR Material Studio
 
 Edits Dark Souls Remastered's textures on the models that use them, shaded with the game's
 material model, through parametric (non-destructive) layers. A Windows desktop app (a single exe).
 
 ## Install
 
-Download `DSR-texture-editor.exe` from the
-[latest release](https://github.com/crsayen/DSR-texture-editor/releases/latest) and run it. It
+Download `DSR-material-studio.exe` from the
+[latest release](https://github.com/crsayen/DSR-material-studio/releases/latest) and run it. It
 needs the Microsoft Edge WebView2 Runtime, which Windows 11 and up-to-date Windows 10 already
 have (otherwise the app offers its download page). The game is found through Steam's library
 list; change it under **Game** if yours is elsewhere.
@@ -123,7 +123,7 @@ Edits live in a **project**: a folder you choose (there is no default). **New…
 
 - the **game folder** to read from (any install works, so modders with several installs pick one
   per project), and whether to read it through the ModEngine2 mods it enables;
-- the **project folder**, where `texture-editor.project.json` is created.
+- the **project folder**, where `material-studio.project.json` is created.
 
 The project file records the game folder, the models you opened (the Project panel lists them;
 opening a project reopens the last one) and every edited texture's layers, saved as you change
@@ -158,7 +158,7 @@ exported first. Block compression is lossy; the RGBA8 exports in the project fol
 lossless copy.
 
 Per-user settings (the default game folder, recent projects, the window position) are in
-`%APPDATA%\DSR Texture Editor\settings.json`.
+`%APPDATA%\DSR Material Studio\settings.json`.
 
 ## Known gaps
 
@@ -178,8 +178,8 @@ reads the game files ([SoulsFormatsNEXT](https://github.com/soulsmods/SoulsForma
 listens on the loopback interface only, on a random port. The page is embedded in the exe.
 
 ```
-git clone --recurse-submodules https://github.com/crsayen/DSR-texture-editor
-cd DSR-texture-editor
+git clone --recurse-submodules https://github.com/crsayen/DSR-material-studio
+cd DSR-material-studio
 dotnet run --project src                 # the window; the page is served from src\wwwroot, so JS edits only need F5
 dotnet run --project src -- --serve      # no window: http://localhost:5199/ in any browser (--port changes it)
 powershell -ExecutionPolicy Bypass -File scripts\publish.ps1    # one self-contained exe in dist\

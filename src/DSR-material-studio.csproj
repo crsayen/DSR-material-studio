@@ -15,9 +15,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <PlatformTarget>x64</PlatformTarget>
-    <AssemblyName>DSR-texture-editor</AssemblyName>
+    <AssemblyName>DSR-material-studio</AssemblyName>
     <RootNamespace>TextureEditor</RootNamespace>
-    <Product>DSR Texture Editor</Product>
+    <Product>DSR Material Studio</Product>
     <Version>0.1.0</Version>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <!-- publish: one exe, no .NET install needed -->
