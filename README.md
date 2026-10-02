@@ -13,9 +13,10 @@ list; change it under **Game** if yours is elsewhere.
 
 ## What it does
 
-- **Models**: armour and weapons (`parts/`), objects (`obj/`) and characters (`chr/`) of the
-  project's game folder, read through the ModEngine2 mods it enables (in
-  `config_darksoulsremastered.toml` order) when asked, then the game files.
+- **Models**: armour and weapons (`parts/`), objects (`obj/`) and characters (`chr/`), read
+  straight from the game's files. Nothing else needs to be installed. If the game folder has a
+  ModEngine2 setup, the "through its ModEngine2 mods" option reads the enabled mod folders first
+  (in `config_darksoulsremastered.toml` order), so textures appear as those mods change them.
 - **Materials**: each FLVER material with its MTD (`mtd/Mtd.mtdbnd.dcx`) parameters. The MTD
   decides the workflow and the colour multipliers.
 - **Shading**: the game's `PackMaterial` (FRPG_FS_HemEnv.fx) converted to standard PBR maps, so
@@ -76,21 +77,24 @@ texture counts, or browses for a folder with a project file. Changing the game f
 project is open changes that project's install. Closing the app with a project open reopens it,
 and its last model, next time.
 
+There are two exports. **Export to game…** is the one that puts edits in the game; **Export** is
+the lossless intermediate it is built from.
+
 **Export** writes the edited texture into the project folder as an uncompressed RGBA8 DDS with
 mips, one file per id the game may give the original texture: `<id>.dds`, where the id is a 64-bit
 hash of the texture's size, DXGI format and top mip, for the typeless, unorm and sRGB variants of
-its format. Mods that replace textures at runtime by content hash can load these files directly
-(the hash function is in `src/Dds.cs`); otherwise convert the DDS files for your own packing tool.
-**Remove export** deletes the files (the layers stay). A texture whose layers changed after its
-export shows "export outdated".
+its format. The game does not read these; a mod DLL that replaces textures at runtime by content
+hash can (the hash function is in `src/Dds.cs`). **Remove export** deletes the files (the layers
+stay). A texture whose layers changed after its export shows "export outdated".
 
 **Export to game…** (under the model's materials) rebuilds the model's archive (`.partsbnd.dcx`,
 `.objbnd.dcx`, `.chrbnd.dcx` with its `.chrtpfbdt`) with every texture the project exports,
 re-encoded in the texture's original DDS format (BC1/BC3/BC5/BC7 or uncompressed) and mip count,
 and writes it in the game's folder layout to one of:
 
-- the game folder itself (the original file is kept beside it as `.orig` the first time);
-- an enabled ModEngine2 mod folder;
+- the game folder itself: the unmodified game then loads it (the original file is kept beside it
+  as `.orig` the first time; restore it before verifying game files in Steam);
+- an enabled ModEngine2 mod folder, if the game folder has a ModEngine2 setup;
 - the project folder, so it can serve as a ModEngine2 mod folder.
 
 The archive is always rebuilt from the game's original (or another mod's copy), so removing a
