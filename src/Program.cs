@@ -144,6 +144,40 @@ app.MapPost("/api/unexport", (string id) =>
     return Results.Json(new { removed = project.Unexport(t) });
 });
 
+// ---- material definitions (MTD): the game's, the project's edited and new ones ----
+app.MapGet("/api/mtd/list", () => Results.Json(files.Mtds().List(project)));
+app.MapGet("/api/mtd", (string name) => { var d = files.Mtds().Detail(name, project); return d == null ? Results.NotFound() : Results.Text(d.ToJsonString(), "application/json"); });
+app.MapPost("/api/mtd", async (HttpRequest req, string name) =>
+{
+    if (project == null) return Results.Conflict("No project: create or open one to keep material edits.");
+    if (!name.EndsWith(".mtd", StringComparison.OrdinalIgnoreCase) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return Results.BadRequest("The name must be a file name ending in .mtd");
+    var body = JsonNode.Parse(await new StreamReader(req.Body).ReadToEndAsync()) as JsonObject; if (body == null) return Results.BadRequest("No definition.");
+    try { MtdStore.FromJson(body); } catch (Exception e) { return Results.BadRequest("Bad definition: " + e.Message); }
+    project.SaveMaterial(name, body);
+    return Results.Text(files.Mtds().Detail(name, project).ToJsonString(), "application/json");
+});
+app.MapPost("/api/mtd/revert", (string name) =>
+{
+    if (project == null) return Results.Conflict("No project.");
+    project.RemoveMaterial(name);
+    var d = files.Mtds().Detail(name, project); return d == null ? Results.Json(new { removed = true }) : Results.Text(d.ToJsonString(), "application/json");
+});
+app.MapPost("/api/mtd/clone", (string name, string @as) =>
+{
+    if (project == null) return Results.Conflict("No project.");
+    if (!@as.EndsWith(".mtd", StringComparison.OrdinalIgnoreCase) || @as.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return Results.BadRequest("The new name must be a file name ending in .mtd");
+    if (files.Mtds().Original(@as) != null || project.Material(@as) != null) return Results.BadRequest($"{@as} already exists.");
+    var src = files.Mtds().Effective(name, project); if (src == null) return Results.NotFound();
+    project.SaveMaterial(@as, MtdStore.ToJson(src));
+    return Results.Text(files.Mtds().Detail(@as, project).ToJsonString(), "application/json");
+});
+app.MapPost("/api/model/assign", (string model, string material, string mtd) =>
+{
+    if (project == null) return Results.Conflict("No project.");
+    if (!string.IsNullOrEmpty(mtd) && files.Mtds().Effective(mtd, project) == null) return Results.NotFound($"{mtd}: no such material definition");
+    project.Assign(model, material, mtd); return Results.Ok();
+});
+
 // ---- export to game: a model's archive rebuilt with the project's exports in the game's formats ----
 List<(string id, string label, string path, string note)> ExportTargets()
 {

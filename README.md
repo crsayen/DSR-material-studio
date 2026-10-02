@@ -62,6 +62,28 @@ A texture's result is always recomputed from the original pixels, top layer firs
 - "Show the selected layer's region" paints it magenta in the 2D view and on the model; the
   active faces condition's own faces are orange (blue when inverted).
 
+## Material definitions (MTD)
+
+**Edit material** on a model's material opens its definition: the shader family, the parameters
+(typed; blend mode and lighting type as named values; colour parameters with a picker) and the
+texture slots (which UV set and sampler register each reads). Parameters and slots can be added
+from what the game's own definitions of that family use, or by name. The viewer follows the
+parameters its material model uses (the diffuse and specular multipliers, the workflow, the blend
+mode); the rest only matter in the game. Changes are saved to the project as they happen, with
+undo (Ctrl+Z, Ctrl+Y).
+
+- **Shader families**: the game builds its pixel shader's name from the family, so only the
+  families the game's own definitions use are offered (39 of them, with how many definitions use
+  each). A definition cannot point at a new shader.
+- **Clone as new…** copies the definition under a new name and points the model's material at it;
+  **Assign another…** points the material at any definition. Both are recorded per model in the
+  project and applied to the FLVER on export.
+- **Revert to game's** drops the project's changes; a new definition can be deleted.
+
+**Export to game…** then also writes `mtd\Mtd.mtdbnd.dcx` (the game's bundle with the project's
+definitions merged in, new ones appended; `MtdPatch.mtdbnd.dcx` too when it holds an edited one)
+and the model's archive with its materials pointed at their assigned definitions.
+
 ## Projects
 
 Edits live in a **project**: a folder you choose (there is no default). **New…** asks for:
@@ -136,9 +158,11 @@ upstream targets .NET 9. Right-click > Inspect in the window opens the DevTools.
 
 - `src/Program.cs`: the server's routes and startup; `Window.cs` the WebView2 window and the native
   folder dialog; `GameFiles.cs` models, materials and textures through the ModEngine2 mods;
-  `Project.cs` the project file and exports; `Dds.cs` DDS headers, the content hash and the writer.
+  `Project.cs` the project file and exports; `Dds.cs` DDS headers, the content hash and the writer;
+  `Mtds.cs` material definitions; `GameExport.cs` the archive and bundle rebuild.
 - `src/wwwroot/js/app.js`: the page; `layers.js` the layer model and evaluation; `material.js`
-  the game material to PBR conversion; `env.js` the lighting presets.
+  the game material to PBR conversion; `mtd.js` the material definition editor; `env.js` the
+  lighting presets.
 
 ## Licence
 

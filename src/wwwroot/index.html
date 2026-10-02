@@ -107,6 +107,29 @@
         <div id="saveState" class="small"></div>
       </section>
     </div>
+    <div id="mtdEditor" hidden>
+      <section>
+        <div class="row between"><h2 id="mtdTitle"></h2><span><button id="mtdUndo" disabled>↶</button> <button id="mtdRedo" disabled>↷</button></span></div>
+        <div id="mtdInfo" class="small dim"></div>
+        <div class="row" style="margin-top:6px"><button id="mtdAssign" title="Use another definition for this model's material">Assign another…</button> <button id="mtdClone" title="Copy this definition under a new name and use it for this material">Clone as new…</button> <button id="mtdRevert">Revert to game's</button></div>
+      </section>
+      <section>
+        <div class="grid wide">
+          <label>Shader family</label><select id="mtdFamily"></select>
+          <label>Description</label><input id="mtdDesc" type="text">
+        </div>
+      </section>
+      <section>
+        <div class="row between"><h3>Parameters</h3><span><select id="mtdAddParam" class="small"></select> <button id="mtdAddParamBtn" title="Add the chosen parameter">+ Add</button></span></div>
+        <div id="mtdParams"></div>
+      </section>
+      <section>
+        <div class="row between"><h3>Texture slots</h3><span><select id="mtdAddTex" class="small"></select> <button id="mtdAddTexBtn" title="Add the chosen slot">+ Add</button></span></div>
+        <div id="mtdTextures"></div>
+        <div class="small dim">The model's FLVER material supplies the texture for each slot by name; the slot says which UV set and sampler register it uses.</div>
+      </section>
+      <section><div id="mtdSaveState" class="small"></div></section>
+    </div>
     <details class="pad small">
       <summary>Display settings</summary>
       <label><input id="flipNX" type="checkbox"> Flip normal map X</label><br>
@@ -141,6 +164,12 @@
   <div class="small dim">Textures whose layers changed are exported first; textures whose export was removed go back to the game's original.</div>
   <div id="geResult" class="small"></div>
   <div class="row between"><span></span><span><button id="geCancel">Close</button> <button id="geGo" class="primary">Export</button></span></div>
+</dialog>
+<dialog id="mtdPickDialog">
+  <h2>Assign a material definition</h2>
+  <input id="mpSearch" type="search" placeholder="Search by name or shader family" autocomplete="off">
+  <ul id="mpList" class="list tall"></ul>
+  <div class="row between"><span class="small dim" id="mpHint"></span><button id="mpCancel">Cancel</button></div>
 </dialog>
 <dialog id="openProjectDialog">
   <h2>Open project</h2>

@@ -21,10 +21,22 @@ namespace TextureEditor
             var source = Original(files, rel, targetRoot) ?? throw new Exception($"{relative}: not found in the game folder or its mods");
             var bnd = BND3.Read(File.ReadAllBytes(source));
             var written = new List<string>(); var replaced = new List<string>(); var skipped = new List<string>();
+            var assignments = project.AssignmentsFor(relative);
             foreach (var f in bnd.Files)
             {
                 var n = f.Name.ToLowerInvariant();
-                if (n.EndsWith(".tpf"))
+                if (n.EndsWith(".flver") && assignments.Count > 0)   // materials pointed at other MTDs
+                {
+                    var flver = FLVER2.Read(f.Bytes); bool any = false;
+                    foreach (var mat in flver.Materials)
+                        if (assignments.TryGetValue(mat.Name, out var mtd))
+                        {
+                            var cut = mat.MTD.LastIndexOfAny(new[] { '\\', '/' });
+                            mat.MTD = (cut >= 0 ? mat.MTD[..(cut + 1)] : "") + mtd; any = true; replaced.Add($"material {mat.Name} -> {mtd}");
+                        }
+                    if (any) f.Bytes = flver.Write();
+                }
+                else if (n.EndsWith(".tpf"))
                 {
                     var tpf = TPF.Read(f.Bytes);
                     if (Replace(tpf, project, replaced, skipped)) f.Bytes = tpf.Write();
@@ -49,6 +61,8 @@ namespace TextureEditor
             Directory.CreateDirectory(Path.GetDirectoryName(dest));
             WriteBytes(dest, bnd.Write());
             written.Add(dest);
+            // The material definitions the project edited or added, merged into the game's bundle.
+            foreach (var b in files.Mtds().WriteBundles(project, targetRoot)) written.Add(b);
             return new Result(written, replaced, skipped, sw.ElapsedMilliseconds);
         }
 

@@ -15,7 +15,8 @@ namespace TextureEditor
         public readonly List<(string name, string path)> Mods = new();   // the enabled ModEngine2 mods, in load order
         readonly string game;
         readonly Dictionary<string, Tex> textures = new();
-        BND3 mtdBundle;
+        MtdStore mtds;
+        public MtdStore Mtds() => mtds ??= new MtdStore(this);
 
         public GameFiles(string game, bool useMods = true)
         {
@@ -86,8 +87,6 @@ namespace TextureEditor
             return seen.Values.ToList();
         }
 
-        BND3 Mtds() => mtdBundle ??= BND3.Read(DCX.Decompress(File.ReadAllBytes(Resolve(Path.Combine("mtd", "Mtd.mtdbnd.dcx")))));
-
         static string Leaf(string p) => p.Split('\\', '/').Last();
         static string Stem(string p) { var l = Leaf(p); var d = l.IndexOf('.'); return d < 0 ? l : l.Substring(0, d); }
 
@@ -131,7 +130,7 @@ namespace TextureEditor
                     for (int p = flver.Nodes[i].ParentIndex; p >= 0; p = flver.Nodes[p].ParentIndex) m *= flver.Nodes[p].ComputeLocalTransform();
                     world[i] = m;
                 }
-                foreach (var mat in flver.Materials) materials.Add(MaterialJson(mat, tpfTextures, project));
+                foreach (var mat in flver.Materials) materials.Add(MaterialJson(mat, tpfTextures, project, relative));
                 foreach (var mesh in flver.Meshes)
                 {
                     var faces = mesh.FaceSets.FirstOrDefault(); if (faces == null) continue;
@@ -176,17 +175,20 @@ namespace TextureEditor
 
         static string B64(float[] a) { var b = new byte[a.Length * 4]; Buffer.BlockCopy(a, 0, b, 0, b.Length); return Convert.ToBase64String(b); }
 
-        object MaterialJson(FLVER2.Material mat, Dictionary<string, (TPF.Texture tex, string source)> tpfTextures, Project project)
+        object MaterialJson(FLVER2.Material mat, Dictionary<string, (TPF.Texture tex, string source)> tpfTextures, Project project, string model)
         {
-            var mtdName = Leaf(mat.MTD);
-            var file = Mtds().Files.FirstOrDefault(f => Leaf(f.Name).Equals(mtdName, StringComparison.OrdinalIgnoreCase));
+            var own = Leaf(mat.MTD);
+            var assigned = project?.Assignment(model, mat.Name);
+            var mtdName = assigned ?? own;
+            var mtd = Mtds().Effective(mtdName, project);
             var prm = new Dictionary<string, object>();
             string shader = null;
-            if (file != null)
+            if (mtd != null)
             {
-                var mtd = MTD.Read(file.Bytes); shader = Leaf(mtd.ShaderPath);
+                shader = Leaf(mtd.ShaderPath);
                 foreach (var p in mtd.Params) prm[p.Name] = p.Value is Array a ? a.Cast<object>().ToArray() : p.Value;
             }
+            var source = mtd == null ? "missing" : project?.Material(mtdName) == null ? "game" : Mtds().Original(mtdName) == null ? "new" : "edited";
             var textures = new List<object>();
             foreach (var t in mat.Textures)
             {
@@ -200,7 +202,7 @@ namespace TextureEditor
                 }
                 textures.Add(new { param = t.ParamName, path = t.Path, name, texture = info });
             }
-            return new { name = mat.Name, mtd = mtdName, shader, @params = prm, textures };
+            return new { name = mat.Name, mtd = mtdName, mtdOwn = own, mtdSource = source, reassigned = assigned != null, shader, @params = prm, textures };
         }
 
         // ---- textures: decoded once, kept by id ----

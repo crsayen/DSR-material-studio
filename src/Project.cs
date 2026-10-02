@@ -56,6 +56,8 @@ namespace TextureEditor
                 ["game"] = new JsonObject { ["folder"] = gameFolder, ["useMods"] = useMods },
                 ["models"] = new JsonArray(),
                 ["textures"] = new JsonObject(),
+                ["materials"] = new JsonObject(),     // MTD name -> definition (edited game ones and new ones)
+                ["assignments"] = new JsonObject(),   // model path -> { FLVER material name -> MTD name }
             };
             var p = new Project(folder, Path.Combine(folder, FileName), doc); p.Save(); return p;
         }
@@ -67,6 +69,7 @@ namespace TextureEditor
             var doc = JsonNode.Parse(File.ReadAllText(file)) as JsonObject ?? throw new Exception("Not a project file");
             if ((string)doc["format"] != "dsr-texture-studio-project") throw new Exception("Not a DSR Texture Editor project file");
             doc["models"] ??= new JsonArray(); doc["textures"] ??= new JsonObject();
+            doc["materials"] ??= new JsonObject(); doc["assignments"] ??= new JsonObject();
             if (doc["game"] == null) doc["game"] = new JsonObject { ["folder"] = (string)doc["gameFolder"], ["useMods"] = true };
             return new Project(folder, file, doc);
         }
@@ -88,9 +91,32 @@ namespace TextureEditor
                     folder = Folder, name = Path.GetFileName(Folder.TrimEnd('\\', '/')),
                     models = doc["models"].AsArray().Select(n => (string)n).ToArray(),
                     textures = Textures.Select(kv => new { key = kv.Key, name = (string)kv.Value["name"], source = (string)kv.Value["source"], layers = kv.Value["layers"]?.AsArray().Count ?? 0, exported = (string)kv.Value["exported"] }).ToArray(),
+                    materials = Materials.Count, assignments = Assignments.Sum(kv => kv.Value.AsObject().Count),
                 };
         }
         public JsonObject Recipe(string key) { lock (gate) return Json.Clone(Textures[key]) as JsonObject; }
+
+        // ---- materials: whole MTD definitions, by file name ----
+        JsonObject Materials => doc["materials"].AsObject();
+        public JsonObject Material(string name) { lock (gate) return Json.Clone(Materials[name]) as JsonObject; }
+        public IEnumerable<string> MaterialNames() { lock (gate) return Materials.Select(kv => kv.Key).ToList(); }
+        public void SaveMaterial(string name, JsonObject def) { lock (gate) { def["edited"] = DateTime.Now.ToString("s"); Materials[name] = Json.Clone(def); Save(); } }
+        public bool RemoveMaterial(string name) { lock (gate) { var had = Materials.Remove(name); if (had) Save(); return had; } }
+        // ---- which MTD a model's FLVER material uses instead of its own ----
+        JsonObject Assignments => doc["assignments"].AsObject();
+        public string Assignment(string model, string material) { lock (gate) return Assignments[model] is JsonObject a ? (string)a[material] : null; }
+        public Dictionary<string, string> AssignmentsFor(string model) { lock (gate) return Assignments[model] is JsonObject a ? a.ToDictionary(kv => kv.Key, kv => (string)kv.Value) : new(); }
+        public void Assign(string model, string material, string mtd)
+        {
+            lock (gate)
+            {
+                if (Assignments[model] is not JsonObject a) Assignments[model] = a = new JsonObject();
+                if (string.IsNullOrEmpty(mtd)) a.Remove(material); else a[material] = mtd;
+                if (a.Count == 0) Assignments.Remove(model);
+                Save();
+            }
+        }
+        public bool HasAssignments(string model) { lock (gate) return Assignments[model] is JsonObject a && a.Count > 0; }
         public bool IsExported(GameFiles.Tex t) => t.Hashes.Any(h => File.Exists(Path.Combine(Folder, h.ToString("X16") + ".dds")));
 
         public void TouchModel(string model)

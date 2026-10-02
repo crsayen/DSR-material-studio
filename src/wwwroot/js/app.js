@@ -5,6 +5,7 @@ import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-
 import { newLayer, newSelector, migrate, evaluate, histogram, valueWeight, describe, describeSelector, CURVES, MAP_NAMES, isCross, hasCrossMap } from './layers.js';
 import { mtdParams, bake, dataTexture, refresh } from './material.js';
 import { PRESETS } from './env.js';
+import { initMaterialEditor } from './mtd.js';
 
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree; THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree; THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
@@ -221,7 +222,7 @@ async function openModel(path) {
     const model = await (await api('/api/model?path=' + encodeURIComponent(path))).json();
     if (S.modelGroup) { scene.remove(S.modelGroup); S.modelGroup.traverse(o => o.geometry?.dispose()); }
     for (const g of S.groups) { g.material.dispose(); for (const v of Object.values(g.views)) v.dispose?.(); for (const m of Object.values(g.maps)) m?.dispose?.(); }
-    setFaceMode(null); S.groups = []; S.textures.clear(); S.editing = null; S.selectedLayer = null; S.activeSel = null; showEditor();
+    setFaceMode(null); mtdEd.close(); S.groups = []; S.textures.clear(); S.editing = null; S.selectedLayer = null; S.activeSel = null; showEditor();
     S.model = model;
     // Materials with the same textures and parameters share one three.js material.
     const groupsByKey = new Map(), matGroup = [];
@@ -304,7 +305,10 @@ function renderMaterials() {
     const sig = mat.name + '|' + mat.mtd; if (seen.has(sig)) continue; seen.add(sig);
     const d = document.createElement('div'); d.className = 'material';
     const wf = g.prm.workflow === 0 ? 'metalness' : 'specular';
-    d.innerHTML = `<div><b>${mat.name}</b></div><div class="mtd">${mat.mtd} · ${wf} workflow${g.prm.workflowDefaulted ? ' (assumed)' : ''}</div>`;
+    const badge = mat.mtdSource === 'edited' ? ' <span class="badge">edited</span>' : mat.mtdSource === 'new' ? ' <span class="badge">new</span>' : mat.mtdSource === 'missing' ? ' <span class="badge warn">missing</span>' : '';
+    d.innerHTML = `<div class="row between"><b>${escapeHtml(mat.name)}</b><button title="Edit this material's definition (MTD): shader family, parameters, texture slots">Edit material</button></div>`
+      + `<div class="mtd">${escapeHtml(mat.mtd)}${badge}${mat.reassigned ? ` <span class="dim">(its own: ${escapeHtml(mat.mtdOwn)})</span>` : ''} · ${wf} workflow${g.prm.workflowDefaulted ? ' (assumed)' : ''}</div>`;
+    d.querySelector('button').onclick = () => mtdEd.show(mat.mtd, mat.name);
     for (const t of mat.textures) {
       const r = roleOf(t.param), row = document.createElement('div'); row.className = 'tex';
       const tt = t.texture && S.textures.get(t.texture.id);
@@ -330,8 +334,26 @@ function semanticsFor(role, prm) { return role === 'spec' ? (prm.workflow === 0 
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const channelOptions = (withLuma, sem = S.editing.sem) => ['r', 'g', 'b', 'a'].map(c => [c, `${c.toUpperCase()} · ${sem[c]}`]).concat(withLuma ? [['luma', 'Brightness (RGB)']] : []);
 
+// ------------------------------------------------------------------ material definitions
+const mtdEd = initMaterialEditor({
+  S, api, el, selectInput, escapeHtml,
+  closeTextureEditor: () => { setFaceMode(null); S.paintMode = null; $('tex2d').style.cursor = ''; S.editing = null; showEditor(); renderMaterials(); },
+  reloadModel: async () => { if (S.model) await openModel(S.model.path); },
+  // A definition changed: the groups using it take its parameters again.
+  afterMaterialChange: (name) => {
+    for (const g of S.groups) {
+      const m = g.materials.find(x => x.mtd === name); if (!m) continue;
+      g.prm = mtdParams(m);
+      g.material.alphaTest = g.prm.alphaTest ? 0.5 : 0; g.material.side = g.prm.alphaTest ? THREE.DoubleSide : THREE.FrontSide; g.material.needsUpdate = true;
+      rebake(g);
+    }
+    if (S.mode === 'path') { pathTracer.updateMaterials(); pathTracer.reset(); }
+    renderMaterials();
+  },
+});
+
 function openEditor(t, role, prm) {
-  setFaceMode(null); S.paintMode = null; $('tex2d').style.cursor = '';
+  setFaceMode(null); S.paintMode = null; $('tex2d').style.cursor = ''; mtdEd.close();
   S.editing = t; t.role = role; t.sem = semanticsFor(role, prm);
   S.selectedLayer = t.layers[t.layers.length - 1]?.id ?? null;
   S.activeSel = layer()?.selectors[0]?.id ?? null;
@@ -343,7 +365,7 @@ function openEditor(t, role, prm) {
   showEditor(); recompute(); renderMaterials(); updateUndoButtons();
 }
 function showEditor() {
-  $('editor').hidden = !S.editing; $('noEdit').hidden = !!S.editing;
+  $('editor').hidden = !S.editing; $('noEdit').hidden = !!S.editing || mtdEd.isOpen();
   if (!S.editing) return;
   renderLayers(); renderLayerForm(); updateSaveState();
 }
@@ -929,7 +951,7 @@ async function afterSwitch() {
   closeModel(); await refreshState(); await loadModels();
 }
 function closeModel() {
-  setFaceMode(null);
+  setFaceMode(null); mtdEd.close();
   if (S.modelGroup) { scene.remove(S.modelGroup); S.modelGroup.traverse(o => o.geometry?.dispose()); S.modelGroup = null; }
   if (S.presetGroup) { scene.remove(S.presetGroup); S.presetGroup = null; }
   S.groups = []; S.textures.clear(); S.editing = null; S.model = null; $('materialsSection').hidden = true; showEditor();
