@@ -178,6 +178,71 @@ app.MapPost("/api/model/assign", (string model, string material, string mtd) =>
     project.Assign(model, material, mtd); return Results.Ok();
 });
 
+// ---- shader workbench: the pixel-shader variants rebuilt from HLSL with fxc, packed for a mod folder ----
+string ShaderSource() => project?.ShaderSource ?? settings.ShaderSource;
+string FxcPath() => !string.IsNullOrEmpty(settings.FxcPath) ? settings.FxcPath : Fxc.Find();
+object ShaderState()
+{
+    var fxc = FxcPath(); var src = ShaderSource(); var bench = files.Shaders(); var cat = bench.Catalogue(src);
+    return new
+    {
+        fxc = new { path = fxc, found = fxc != null && File.Exists(fxc), version = fxc != null && File.Exists(fxc) ? Fxc.VersionOf(fxc) : null, custom = !string.IsNullOrEmpty(settings.FxcPath), detected = Fxc.Find() },
+        source = new { folder = src, ok = ShaderWorkbench.SourceOk(src), files = ShaderWorkbench.SourceFiles(src), overrideError = bench.OverrideError },
+        archive = new { path = bench.ArchivePath, count = cat.Count },
+        variants = cat.Select(v => new { name = v.Name, family = v.Family, slots = v.Slots, suffix = v.Suffix, source = v.Source, defines = v.Defines, buildable = v.Buildable }),
+        built = project != null ? bench.Built(project) : null,
+        project = project != null, blobFolder = project != null ? ShaderWorkbench.BlobFolder(project) : null,
+    };
+}
+app.MapGet("/api/shaders/state", () => Results.Json(ShaderState()));
+app.MapPost("/api/shaders/settings", async (HttpRequest req) =>
+{
+    var body = JsonNode.Parse(await new StreamReader(req.Body).ReadToEndAsync());
+    if (body?["fxc"] != null) { var f = (string)body["fxc"]; settings.FxcPath = string.IsNullOrWhiteSpace(f) ? null : f; settings.Save(); }
+    if (body?["source"] != null)
+    {
+        var s = (string)body["source"];
+        if (!string.IsNullOrWhiteSpace(s) && !ShaderWorkbench.SourceOk(s)) return Results.BadRequest($"{s} has no .fx files.");
+        if (project != null) project.ShaderSource = s; else { settings.ShaderSource = s; settings.Save(); }
+    }
+    return Results.Json(ShaderState());
+});
+app.MapGet("/api/shaders/file", (string path) =>
+{
+    try { return Results.Text(File.ReadAllText(ShaderWorkbench.SourcePath(ShaderSource(), path)), "text/plain"); }
+    catch (Exception e) { return Results.BadRequest(e.Message); }
+});
+app.MapPost("/api/shaders/file", async (HttpRequest req, string path) =>
+{
+    try { var full = ShaderWorkbench.SourcePath(ShaderSource(), path); File.WriteAllText(full, await new StreamReader(req.Body).ReadToEndAsync()); return Results.Json(new { modified = File.GetLastWriteTime(full) }); }
+    catch (Exception e) { return Results.BadRequest(e.Message); }
+});
+app.MapPost("/api/shaders/build", async (HttpRequest req) =>
+{
+    if (project == null) return Results.Conflict("No project: the built shaders are kept in the project folder.");
+    var fxc = FxcPath(); if (fxc == null || !File.Exists(fxc)) return Results.BadRequest("fxc not found: install a Windows SDK or set its path.");
+    var src = ShaderSource(); if (!ShaderWorkbench.SourceOk(src)) return Results.BadRequest("Choose the HLSL source folder first.");
+    var names = (JsonNode.Parse(await new StreamReader(req.Body).ReadToEndAsync())?["names"]?.AsArray() ?? new JsonArray()).Select(n => (string)n).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var bench = files.Shaders(); var todo = bench.Catalogue(src).Where(v => names.Contains(v.Name)).ToList();
+    var results = new ShaderWorkbench.BuildResult[todo.Count];
+    Parallel.For(0, todo.Count, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1) }, i => results[i] = bench.Build(todo[i], fxc, src, project));
+    return Results.Json(new { results });
+});
+app.MapPost("/api/shaders/discard", async (HttpRequest req) =>
+{
+    if (project == null) return Results.Conflict("No project.");
+    var names = (JsonNode.Parse(await new StreamReader(req.Body).ReadToEndAsync())?["names"]?.AsArray() ?? new JsonArray()).Select(n => (string)n);
+    return Results.Json(new { removed = files.Shaders().Discard(project, names) });
+});
+app.MapPost("/api/shaders/pack", (string target) =>
+{
+    if (project == null) return Results.Conflict("No project.");
+    var t = ExportTargets().FirstOrDefault(x => x.id == target); if (t.path == null) return Results.BadRequest("Unknown target.");
+    settings.ExportTarget = target; settings.Save();
+    try { return Results.Json(files.Shaders().Pack(project, t.path)); }
+    catch (Exception e) { return Results.Problem(e.Message); }
+});
+
 // ---- export to game: a model's archive rebuilt with the project's exports in the game's formats ----
 List<(string id, string label, string path, string note)> ExportTargets()
 {

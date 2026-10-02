@@ -6,6 +6,7 @@ import { newLayer, newSelector, migrate, evaluate, histogram, valueWeight, descr
 import { mtdParams, bake, dataTexture, refresh } from './material.js';
 import { PRESETS } from './env.js';
 import { initMaterialEditor } from './mtd.js';
+import { initShaderWorkbench } from './shaders.js';
 
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree; THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree; THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
@@ -323,6 +324,7 @@ function renderMaterials() {
   }
 }
 
+
 // ------------------------------------------------------------------ editor
 const SEMANTICS = {
   spec0: { r: 'Roughness', g: 'Metalness', b: 'Non-metal reflectance', a: 'Light power' },
@@ -335,6 +337,25 @@ const escapeHtml = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<'
 const channelOptions = (withLuma, sem = S.editing.sem) => ['r', 'g', 'b', 'a'].map(c => [c, `${c.toUpperCase()} · ${sem[c]}`]).concat(withLuma ? [['luma', 'Brightness (RGB)']] : []);
 
 // ------------------------------------------------------------------ material definitions
+// A target folder for something written in the game's layout: the game, a mod folder or the project.
+function chooseTarget(text) {
+  return new Promise(async (resolve) => {
+    const dlg = $('targetDialog'), box = $('tdTargets'); box.innerHTML = ''; $('tdText').textContent = text;
+    const { targets, last } = await (await api('/api/export/targets')).json();
+    for (const t of targets) {
+      const l = document.createElement('label');
+      l.innerHTML = `<input type="radio" name="tdTarget" value="${escapeHtml(t.id)}"> <b>${escapeHtml(t.label)}</b> <span class="small dim">${escapeHtml(t.note)}</span><div class="path small">${escapeHtml(t.path)}</div>`;
+      box.append(l);
+    }
+    (box.querySelector(`input[value="${CSS.escape(last || '')}"]`) || box.querySelector('input[value="project"]') || box.querySelector('input')).checked = true;
+    const done = (v) => { dlg.close(); resolve(v); };
+    $('tdOk').onclick = () => done(box.querySelector('input:checked')?.value || null);
+    $('tdCancel').onclick = () => done(null); dlg.oncancel = (e) => { e.preventDefault(); done(null); };
+    dlg.showModal();
+  });
+}
+const shaderBench = initShaderWorkbench({ api, el, escapeHtml, pickFolder, exportTargets: chooseTarget });
+
 const mtdEd = initMaterialEditor({
   S, api, el, selectInput, escapeHtml,
   closeTextureEditor: () => { setFaceMode(null); S.paintMode = null; $('tex2d').style.cursor = ''; S.editing = null; showEditor(); renderMaterials(); },

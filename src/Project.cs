@@ -117,6 +117,12 @@ namespace TextureEditor
             }
         }
         public bool HasAssignments(string model) { lock (gate) return Assignments[model] is JsonObject a && a.Count > 0; }
+        // ---- the shader workbench's source folder ----
+        public string ShaderSource
+        {
+            get { lock (gate) return (string)doc["shaders"]?["source"]; }
+            set { lock (gate) { doc["shaders"] = new JsonObject { ["source"] = value }; Save(); } }
+        }
         public bool IsExported(GameFiles.Tex t) => t.Hashes.Any(h => File.Exists(Path.Combine(Folder, h.ToString("X16") + ".dds")));
 
         public void TouchModel(string model)

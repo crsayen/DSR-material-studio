@@ -68,7 +68,7 @@ namespace TextureEditor
 
         // The untouched file: from any root other than the target, else the backup kept beside the
         // target, else the target itself (backed up before it is overwritten).
-        static string Original(GameFiles files, string rel, string targetRoot)
+        internal static string Original(GameFiles files, string rel, string targetRoot)
         {
             foreach (var r in files.Roots)
             {
@@ -80,7 +80,7 @@ namespace TextureEditor
             return File.Exists(dest) ? dest : null;
         }
         static bool SamePath(string a, string b) => string.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
-        static void Backup(string dest, string source) { if (SamePath(dest, source) && !File.Exists(dest + ".orig")) File.Copy(dest, dest + ".orig"); }
+        internal static void Backup(string dest, string source) { if (SamePath(dest, source) && !File.Exists(dest + ".orig")) File.Copy(dest, dest + ".orig"); }
         static void WriteBytes(string path, byte[] bytes) { File.WriteAllBytes(path + ".tmp", bytes); File.Move(path + ".tmp", path, true); }
         static string Stem(string p) { var l = p.Split('\\', '/').Last(); var d = l.IndexOf('.'); return d < 0 ? l : l.Substring(0, d); }
 

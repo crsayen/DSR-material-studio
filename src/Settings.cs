@@ -13,6 +13,8 @@ namespace TextureEditor
         public int[] Window { get; set; }          // x, y, width, height of the normal (not maximized) window
         public bool WindowMaximized { get; set; }
         public string ExportTarget { get; set; }   // the last "export to game" target folder
+        public string FxcPath { get; set; }        // the shader compiler; null = the newest installed Windows SDK's
+        public string ShaderSource { get; set; }   // the HLSL source folder, when no project is open
 
         public static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DSR Texture Editor");
         static string FilePath => Path.Combine(Folder, "settings.json");

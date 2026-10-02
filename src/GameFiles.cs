@@ -17,6 +17,8 @@ namespace TextureEditor
         readonly Dictionary<string, Tex> textures = new();
         MtdStore mtds;
         public MtdStore Mtds() => mtds ??= new MtdStore(this);
+        ShaderWorkbench shaders;
+        public ShaderWorkbench Shaders() => shaders ??= new ShaderWorkbench(this);
 
         public GameFiles(string game, bool useMods = true)
         {

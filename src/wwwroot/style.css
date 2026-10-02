@@ -77,6 +77,14 @@ ul.list li.dir { justify-content: flex-start; gap: 4px; }
 ul.list li.recent { display: block; padding: 6px 8px; } ul.list li.recent .path { word-break: break-all; color: var(--dim); }
 .targets { margin: 8px 0; } .targets label { display: block; padding: 5px 6px; border-radius: 3px; cursor: pointer; } .targets label:hover { background: #262a30; } .targets .path { word-break: break-all; color: var(--dim); margin-left: 20px; }
 #geResult ul { margin: 4px 0 0; padding-left: 18px; } #gameExportDialog { max-width: 560px; }
+#shaderBench { position: fixed; inset: 0; background: var(--bg, #15181c); z-index: 20; display: flex; flex-direction: column; padding: 10px 14px; box-sizing: border-box; }
+.sb-head .grid { margin-top: 4px; } .sb-head .path { word-break: break-all; }
+.sb-body { flex: 1; display: grid; grid-template-columns: 220px 1fr 460px; gap: 12px; min-height: 0; margin-top: 8px; }
+.sb-files, .sb-variants, .sb-editor { display: flex; flex-direction: column; min-height: 0; } .sb-files ul, .sb-variants ul { flex: 1; max-height: none; }
+#sbEditor { flex: 1; width: 100%; box-sizing: border-box; font: 12px/1.4 Consolas, 'Cascadia Mono', monospace; background: #0d0f11; color: #d8dde3; border: 1px solid var(--line); border-radius: 4px; padding: 6px; resize: none; tab-size: 4; }
+#sbVariants li { font-size: 11px; gap: 6px; justify-content: flex-start; } #sbVariants li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sbDetail { max-height: 180px; overflow: auto; margin: 4px 0; } #sbResults { max-height: 160px; overflow: auto; } pre.log { white-space: pre-wrap; font-size: 11px; background: #0d0f11; padding: 4px 6px; border-radius: 3px; margin: 2px 0; }
+pre.log a { color: var(--accent); } #sbDetail code { background: #0d0f11; padding: 0 3px; border-radius: 2px; }
 .prow { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-top: 1px dashed var(--line); font-size: 12px; } .prow:first-child { border-top: 0; }
 .prow .pname { flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .prow .pval { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .prow .pval input.num { width: 58px; } .prow .pval input[type=color] { width: 26px; height: 22px; padding: 0; border: 1px solid var(--line); background: none; } .prow input.num.warn { border-color: #f0b27a; }

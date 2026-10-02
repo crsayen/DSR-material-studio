@@ -84,6 +84,34 @@ undo (Ctrl+Z, Ctrl+Y).
 definitions merged in, new ones appended; `MtdPatch.mtdbnd.dcx` too when it holds an edited one)
 and the model's archive with its materials pointed at their assigned definitions.
 
+## Shader workbench
+
+**Workbench…** (under Shaders) rebuilds the game's pixel shaders from HLSL and packs them for a mod
+folder. The game cannot load a shader under a new name (it builds the names itself from a
+material's shader family and the draw's state), so the workbench builds the names that exist in
+`shader\FRPG_FlverPBL_fpo_DX11.shaderbnd.dcx` and replaces their bytecode; custom shading goes
+into those shaders, usually behind a per-material parameter.
+
+- **Compiler**: `fxc.exe` from the newest installed Windows SDK (the "Windows SDK for Desktop C++"
+  component), or any path you set. Shaders are compiled as `ps_5_0` DXBC.
+- **Sources**: a folder you choose with `FRPG_FS_HemEnv.fx` and the other FlverPBL sources (for
+  example the `source\FRPG_FlverPBL` folder of the
+  [DSR Shader Compiler](https://github.com/magpiemustdie/DSR-Shader-Compiler-ai), which
+  reconstructs them). A `Common` folder beside it is on the include path. Files are edited in
+  place (Ctrl+S saves).
+- **Variants**: every pixel shader in the archive, grouped by family. The `Phn`, `Gst` and `Sfx`
+  families' HemEnv, HemDir3, Lerp, PntS, Parallax, Subsurf, Alp and Non variants, and the Sfx base
+  shaders, have build rules (source file and defines) following the game's naming, as the DSR
+  Shader Compiler reconstructed them. A `variants.json` beside the sources can change or add rules:
+  `[{ "match": "<regex on the name>", "source": "x.fx", "defines": [...], "add": [...] }]`.
+- **Build** compiles the selected variants in parallel; failures list fxc's messages, and a
+  message's file and line open in the editor. Built shaders are kept in the project's `shaders`
+  folder with their logs.
+- **Pack to…** writes the archive with the built shaders in place of the members of the same name
+  to the game folder (the original kept beside it as `.orig`), a ModEngine2 mod folder or the
+  project folder, and lists every member's DXBC digest in `shaders\digests.txt` for tooling that
+  identifies shaders that way.
+
 ## Projects
 
 Edits live in a **project**: a folder you choose (there is no default). **New…** asks for:
@@ -159,10 +187,11 @@ upstream targets .NET 9. Right-click > Inspect in the window opens the DevTools.
 - `src/Program.cs`: the server's routes and startup; `Window.cs` the WebView2 window and the native
   folder dialog; `GameFiles.cs` models, materials and textures through the ModEngine2 mods;
   `Project.cs` the project file and exports; `Dds.cs` DDS headers, the content hash and the writer;
-  `Mtds.cs` material definitions; `GameExport.cs` the archive and bundle rebuild.
+  `Mtds.cs` material definitions; `Shaders.cs` the shader workbench; `GameExport.cs` the archive and
+  bundle rebuild.
 - `src/wwwroot/js/app.js`: the page; `layers.js` the layer model and evaluation; `material.js`
-  the game material to PBR conversion; `mtd.js` the material definition editor; `env.js` the
-  lighting presets.
+  the game material to PBR conversion; `mtd.js` the material definition editor; `shaders.js` the shader
+  workbench; `env.js` the lighting presets.
 
 ## Licence
 
