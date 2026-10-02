@@ -75,3 +75,5 @@ code { font-size: 11px; background: #0006; padding: 0 3px; border-radius: 3px; }
 #projectInfo .path, #gameInfo .path { word-break: break-all; color: var(--dim); }
 ul.list li.dir { justify-content: flex-start; gap: 4px; }
 ul.list li.recent { display: block; padding: 6px 8px; } ul.list li.recent .path { word-break: break-all; color: var(--dim); }
+.targets { margin: 8px 0; } .targets label { display: block; padding: 5px 6px; border-radius: 3px; cursor: pointer; } .targets label:hover { background: #262a30; } .targets .path { word-break: break-all; color: var(--dim); margin-left: 20px; }
+#geResult ul { margin: 4px 0 0; padding-left: 18px; } #gameExportDialog { max-width: 560px; }

@@ -839,18 +839,55 @@ async function saveLayers(t) {
 $('writeGame').onclick = async () => {
   const t = S.editing; if (!t) return;
   $('writeGame').disabled = true;
-  try {
-    if (saveTimers.has(t)) { clearTimeout(saveTimers.get(t)); await saveLayers(t); }
-    if (t.layers.length === 0) { await api('/api/unexport?id=' + encodeURIComponent(t.info.id), { method: 'POST' }); t.info.exported = false; }
-    else { const r = await (await api(`/api/export?id=${encodeURIComponent(t.info.id)}&width=${t.width}&height=${t.height}`, { method: 'POST', body: t.edited })).json(); t.info.exported = r.written.length > 0; }
-    t.dirty = false;
-  } catch (e) { $('saveState').innerHTML = `<span class="err">${escapeHtml(e.message)}</span>`; $('writeGame').disabled = false; return; }
+  try { await exportTexture(t); }
+  catch (e) { $('saveState').innerHTML = `<span class="err">${escapeHtml(e.message)}</span>`; $('writeGame').disabled = false; return; }
   updateSaveState(); renderMaterials(); refreshState();
 };
 $('revertGame').onclick = async () => {
   const t = S.editing; if (!t) return;
   await api('/api/unexport?id=' + encodeURIComponent(t.info.id), { method: 'POST' });
   t.info.exported = false; t.dirty = t.layers.length > 0; updateSaveState(); renderMaterials(); refreshState();
+};
+
+// ------------------------------------------------------------------ export to game
+// The project's RGBA8 exports brought up to date for every texture of the model, then the model's
+// archive rebuilt by the server with those exports re-encoded in the original formats.
+async function exportTexture(t) {
+  if (saveTimers.has(t)) { clearTimeout(saveTimers.get(t)); await saveLayers(t); }
+  if (t.layers.length === 0) { await api('/api/unexport?id=' + encodeURIComponent(t.info.id), { method: 'POST' }); t.info.exported = false; }
+  else { const r = await (await api(`/api/export?id=${encodeURIComponent(t.info.id)}&width=${t.width}&height=${t.height}`, { method: 'POST', body: t.edited })).json(); t.info.exported = r.written.length > 0; }
+  t.dirty = false;
+}
+$('exportGame').onclick = async () => {
+  if (!S.model) return;
+  const dlg = $('gameExportDialog'), box = $('geTargets'); box.innerHTML = ''; $('geResult').innerHTML = '';
+  $('geModel').textContent = S.model.path.split('/').pop();
+  if (!S.state?.project) { $('geResult').innerHTML = '<span class="err">Create or open a project first: the game export is built from the project\'s exported textures.</span>'; $('geGo').disabled = true; dlg.showModal(); return; }
+  const { targets, last } = await (await api('/api/export/targets')).json();
+  for (const t of targets) {
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="radio" name="geTarget" value="${escapeHtml(t.id)}"> <b>${escapeHtml(t.label)}</b> <span class="small dim">${escapeHtml(t.note)}</span><div class="path small">${escapeHtml(t.path)}</div>`;
+    box.append(l);
+  }
+  (box.querySelector(`input[value="${CSS.escape(last || '')}"]`) || box.querySelector('input[value="project"]') || box.querySelector('input')).checked = true;   // the last target, else the harmless one
+  $('geGo').disabled = false;
+  dlg.showModal();
+};
+$('geCancel').onclick = () => $('gameExportDialog').close();
+$('geGo').onclick = async () => {
+  const target = $('geTargets').querySelector('input:checked')?.value; if (!target || !S.model) return;
+  $('geGo').disabled = true; $('geResult').innerHTML = 'Exporting… (block compression takes a few seconds per texture)';
+  try {
+    for (const t of S.textures.values()) if ((t.layers.length > 0 && t.dirty) || (t.layers.length === 0 && t.info.exported)) await exportTexture(t);
+    const r = await (await api(`/api/export/game?model=${encodeURIComponent(S.model.path)}&target=${encodeURIComponent(target)}`, { method: 'POST' })).json();
+    const li = (a) => a.map(x => `<li>${escapeHtml(x)}</li>`).join('');
+    $('geResult').innerHTML = `<span class="ok">Done in ${(r.ms / 1000).toFixed(1)} s.</span>`
+      + (r.textures.length ? `<div>Textures replaced:</div><ul>${li(r.textures)}</ul>` : '<div class="dim">No exported textures in this archive: it was written unchanged.</div>')
+      + (r.skipped.length ? `<div class="err">Skipped:</div><ul>${li(r.skipped)}</ul>` : '')
+      + `<div>Written:</div><ul>${li(r.files)}</ul>`;
+  } catch (e) { $('geResult').innerHTML = `<span class="err">${escapeHtml(e.message.replace(/^[^:]*: \d+ /, ''))}</span>`; }
+  $('geGo').disabled = false;
+  if (S.editing) updateSaveState(); renderMaterials(); refreshState();
 };
 
 // ------------------------------------------------------------------ project and game folder

@@ -1,8 +1,7 @@
 # DSR Texture Editor
 
-Edit Dark Souls Remastered's textures on the models that use them, shaded with the game's own
-material model, through parametric (non-destructive) layers. A Windows desktop app: one exe, no
-install, no server to run.
+Edits Dark Souls Remastered's textures on the models that use them, shaded with the game's
+material model, through parametric (non-destructive) layers. A Windows desktop app (a single exe).
 
 ## Install
 
@@ -84,6 +83,20 @@ its format. Mods that replace textures at runtime by content hash can load these
 (the hash function is in `src/Dds.cs`); otherwise convert the DDS files for your own packing tool.
 **Remove export** deletes the files (the layers stay). A texture whose layers changed after its
 export shows "export outdated".
+
+**Export to game…** (under the model's materials) rebuilds the model's archive (`.partsbnd.dcx`,
+`.objbnd.dcx`, `.chrbnd.dcx` with its `.chrtpfbdt`) with every texture the project exports,
+re-encoded in the texture's original DDS format (BC1/BC3/BC5/BC7 or uncompressed) and mip count,
+and writes it in the game's folder layout to one of:
+
+- the game folder itself (the original file is kept beside it as `.orig` the first time);
+- an enabled ModEngine2 mod folder;
+- the project folder, so it can serve as a ModEngine2 mod folder.
+
+The archive is always rebuilt from the game's original (or another mod's copy), so removing a
+texture's export and exporting again restores that texture. Textures whose layers changed are
+exported first. Block compression is lossy; the RGBA8 exports in the project folder stay the
+lossless copy.
 
 Per-user settings (the default game folder, recent projects, the window position) are in
 `%APPDATA%\DSR Texture Editor\settings.json`.

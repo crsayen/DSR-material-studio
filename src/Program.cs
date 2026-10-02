@@ -144,6 +144,24 @@ app.MapPost("/api/unexport", (string id) =>
     return Results.Json(new { removed = project.Unexport(t) });
 });
 
+// ---- export to game: a model's archive rebuilt with the project's exports in the game's formats ----
+List<(string id, string label, string path, string note)> ExportTargets()
+{
+    var list = new List<(string, string, string, string)> { ("game", "The game folder", GameFolder(), "Overwrites the game's own file. The first time, the original is kept beside it as .orig (restore it before verifying game files in Steam).") };
+    foreach (var (name, path) in files.Mods) list.Add(("mod:" + name, $"ModEngine2 mod \"{name}\"", path, "ModEngine2 loads it over the game's file."));
+    if (project != null) list.Add(("project", "The project folder", project.Folder, "The game's folder layout inside the project (parts\\, chr\\, obj\\): usable as a ModEngine2 mod folder."));
+    return list;
+}
+app.MapGet("/api/export/targets", () => Results.Json(new { targets = ExportTargets().Select(t => new { t.id, t.label, t.path, t.note }), last = settings.ExportTarget }));
+app.MapPost("/api/export/game", (string model, string target) =>
+{
+    if (project == null) return Results.Conflict("No project: create or open one first.");
+    var t = ExportTargets().FirstOrDefault(x => x.id == target); if (t.path == null) return Results.BadRequest("Unknown target.");
+    settings.ExportTarget = target; settings.Save();
+    try { return Results.Json(GameExport.Repack(files, project, model, t.path)); }
+    catch (Exception e) { return Results.Problem(e.Message); }
+});
+
 await app.StartAsync();
 var url = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.First().TrimEnd('/') + "/";
 Console.WriteLine($"game {GameFolder()}\nsearch order: {string.Join(" > ", files.Roots)}\nproject {project?.Folder ?? "(none)"}\nDSR Texture Editor: {url}");

@@ -12,6 +12,7 @@ namespace TextureEditor
     class GameFiles
     {
         public readonly string[] Roots;
+        public readonly List<(string name, string path)> Mods = new();   // the enabled ModEngine2 mods, in load order
         readonly string game;
         readonly Dictionary<string, Tex> textures = new();
         BND3 mtdBundle;
@@ -22,10 +23,10 @@ namespace TextureEditor
             var roots = new List<string>();
             var toml = Path.Combine(game, "ModEngine2", "config_darksoulsremastered.toml");
             if (useMods && File.Exists(toml))
-                foreach (Match m in Regex.Matches(File.ReadAllText(toml), @"\{\s*enabled\s*=\s*true\s*,\s*name\s*=\s*""[^""]*""\s*,\s*path\s*=\s*""([^""]+)"""))
+                foreach (Match m in Regex.Matches(File.ReadAllText(toml), @"\{\s*enabled\s*=\s*true\s*,\s*name\s*=\s*""([^""]*)""\s*,\s*path\s*=\s*""([^""]+)"""))
                 {
-                    var p = Path.Combine(game, "ModEngine2", m.Groups[1].Value);
-                    if (Directory.Exists(p)) roots.Add(p);
+                    var p = Path.Combine(game, "ModEngine2", m.Groups[2].Value);
+                    if (Directory.Exists(p)) { roots.Add(p); Mods.Add((m.Groups[1].Value, p)); }
                 }
             roots.Add(game);
             Roots = roots.ToArray();

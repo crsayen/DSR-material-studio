@@ -12,6 +12,7 @@ namespace TextureEditor
         public List<string> RecentProjects { get; set; } = new();
         public int[] Window { get; set; }          // x, y, width, height of the normal (not maximized) window
         public bool WindowMaximized { get; set; }
+        public string ExportTarget { get; set; }   // the last "export to game" target folder
 
         public static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DSR Texture Editor");
         static string FilePath => Path.Combine(Folder, "settings.json");

@@ -5,13 +5,13 @@ namespace TextureEditor
     // ---- DDS header + the DLL's runtime content hash ----------------------------------------------
     class DdsInfo
     {
-        public readonly byte[] Bytes; public readonly int Width, Height, Dxgi, DataOffset; public readonly string Family;
+        public readonly byte[] Bytes; public readonly int Width, Height, Dxgi, DataOffset, MipCount; public readonly string Family;
         public string FormatName => Family;
         public DdsInfo(byte[] b)
         {
             Bytes = b;
             if (b.Length < 128 || BitConverter.ToUInt32(b, 0) != 0x20534444) return;
-            Height = BitConverter.ToInt32(b, 12); Width = BitConverter.ToInt32(b, 16);
+            Height = BitConverter.ToInt32(b, 12); Width = BitConverter.ToInt32(b, 16); MipCount = BitConverter.ToInt32(b, 28);
             uint pfFlags = BitConverter.ToUInt32(b, 80), fourCC = BitConverter.ToUInt32(b, 84), rgbBits = BitConverter.ToUInt32(b, 88);
             uint rMask = BitConverter.ToUInt32(b, 92);
             DataOffset = 128;
@@ -69,11 +69,12 @@ namespace TextureEditor
 
     static class DdsWriter
     {
-        public static byte[] Rgba8WithMips(byte[] rgba, int w, int h)
+        // The mip chain of an RGBA8 image (box filter), at most `max` levels including the first.
+        public static List<byte[]> MipLevels(byte[] rgba, int w, int h, int max = int.MaxValue)
         {
             var levels = new List<byte[]> { rgba };
             int lw = w, lh = h;
-            while (lw > 1 || lh > 1)
+            while ((lw > 1 || lh > 1) && levels.Count < max)
             {
                 int nw = Math.Max(1, lw / 2), nh = Math.Max(1, lh / 2); var src = levels[^1]; var dst = new byte[nw * nh * 4];
                 for (int y = 0; y < nh; y++) for (int x = 0; x < nw; x++) for (int c = 0; c < 4; c++)
@@ -84,6 +85,11 @@ namespace TextureEditor
                 }
                 levels.Add(dst); lw = nw; lh = nh;
             }
+            return levels;
+        }
+        public static byte[] Rgba8WithMips(byte[] rgba, int w, int h)
+        {
+            var levels = MipLevels(rgba, w, h);
             using var ms = new MemoryStream(); using var bw = new BinaryWriter(ms);
             bw.Write(0x20534444u); bw.Write(124u);
             bw.Write(0x1u | 0x2u | 0x4u | 0x8u | 0x1000u | 0x20000u);   // caps, height, width, pitch, pixelformat, mipcount
