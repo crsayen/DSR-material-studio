@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WebGLPathTracer } from 'three-gpu-pathtracer';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
-import { newLayer, newSelector, migrate, evaluate, histogram, valueWeight, describe, describeSelector, CURVES } from './layers.js';
+import { newLayer, newSelector, migrate, evaluate, histogram, valueWeight, describe, describeSelector, CURVES, MAP_NAMES, isCross, hasCrossMap } from './layers.js';
 import { mtdParams, bake, dataTexture, refresh } from './material.js';
 import { PRESETS } from './env.js';
 
@@ -201,6 +201,19 @@ async function loadTexture(info) {
   S.textures.set(info.id, t);
   return t;
 }
+// Another map of the texture's material, for conditions that read it (value conditions with `map`).
+// Its original pixels, or its edited result when the condition reads "current".
+function mapSourceFor(t) {
+  return (sel) => {
+    for (const g of t.users) {
+      const o = g.tex[sel.map]; if (!o) continue;
+      return o === t ? null : { px: sel.from === 'current' ? o.edited : o.original, w: o.width, h: o.height };
+    }
+    return undefined;
+  };
+}
+const otherMaps = (t) => { for (const g of t.users) return g; return null; };   // the first material group using t
+function reevaluate(t) { t.edited = evaluate(t.original, t.layers, t.width, t.height, faceMask, null, mapSourceFor(t)).pixels; }
 
 async function openModel(path) {
   $('loading').hidden = false;
@@ -221,6 +234,7 @@ async function openModel(path) {
       if (!g) {
         g = { key, prm, tex: {}, maps: {}, views: {}, meshes: [], materials: [] };
         for (const r of ['albedo', 'spec', 'normal']) if (tex[r]) { g.tex[r] = await loadTexture(tex[r]); g.tex[r].users.add(g); }
+        for (const t of Object.values(g.tex)) if (hasCrossMap(t.layers)) reevaluate(t);   // conditions on the other maps, now that they are loaded
         groupsByKey.set(key, g); S.groups.push(g);
         g.material = new THREE.MeshPhysicalMaterial({ roughness: 1, metalness: 1, specularIntensity: 1, ior: 1.5, vertexColors: true,
           alphaTest: prm.alphaTest ? 0.5 : 0, side: prm.alphaTest ? THREE.DoubleSide : THREE.FrontSide });
@@ -314,10 +328,10 @@ const SEMANTICS = {
 };
 function semanticsFor(role, prm) { return role === 'spec' ? (prm.workflow === 0 ? SEMANTICS.spec0 : SEMANTICS.spec1) : SEMANTICS[role]; }
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const channelOptions = (withLuma) => ['r', 'g', 'b', 'a'].map(c => [c, `${c.toUpperCase()} · ${S.editing.sem[c]}`]).concat(withLuma ? [['luma', 'Brightness (RGB)']] : []);
+const channelOptions = (withLuma, sem = S.editing.sem) => ['r', 'g', 'b', 'a'].map(c => [c, `${c.toUpperCase()} · ${sem[c]}`]).concat(withLuma ? [['luma', 'Brightness (RGB)']] : []);
 
 function openEditor(t, role, prm) {
-  setFaceMode(null);
+  setFaceMode(null); S.paintMode = null; $('tex2d').style.cursor = '';
   S.editing = t; t.role = role; t.sem = semanticsFor(role, prm);
   S.selectedLayer = t.layers[t.layers.length - 1]?.id ?? null;
   S.activeSel = layer()?.selectors[0]?.id ?? null;
@@ -353,7 +367,7 @@ function renderLayers() {
     ol.appendChild(li);
   });
 }
-function selectLayer(id) { S.selectedLayer = id; S.activeSel = layer()?.selectors[0]?.id ?? null; setFaceMode(null); }
+function selectLayer(id) { S.selectedLayer = id; S.activeSel = layer()?.selectors[0]?.id ?? null; setFaceMode(null); S.paintMode = null; $('tex2d').style.cursor = ''; }
 
 $('addLayer').onclick = () => {
   const t = S.editing; if (!t) return;
@@ -391,6 +405,7 @@ $('lOp').onchange = () => { const L = layer(); if (!L) return; L.op = $('lOp').v
 // ---- conditions ("where") ----
 $('addValueSel').onclick = () => { const L = layer(); if (!L) return; const s = newSelector('value', { source: L.target === 'rgb' ? 'luma' : L.target }); L.selectors.push(s); S.activeSel = s.id; changed(); };
 $('addFaceSel').onclick = () => { const L = layer(); if (!L) return; const s = newSelector('faces', { model: S.model?.path }); L.selectors.push(s); S.activeSel = s.id; changed(); setFaceMode(s.id); };
+$('addPaintSel').onclick = () => { const L = layer(); if (!L) return; const s = newSelector('paint'); L.selectors.push(s); S.activeSel = s.id; changed(); setPaintMode(s.id); };
 
 function el(tag, attrs = {}, ...kids) { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k.startsWith('on')) e[k] = v; else if (k === 'cls') e.className = v; else e.setAttribute(k, v); } for (const k of kids) e.append(k); return e; }
 function selectInput(options, value, onchange) { const s = el('select'); for (const [v, l] of options) s.add(new Option(l, v)); s.value = value; s.onchange = () => onchange(s.value); return s; }
@@ -414,9 +429,9 @@ function renderSelectors() {
     const del = el('button', { title: 'Remove this condition' }, '✕');
     del.onclick = (e) => { e.stopPropagation(); L.selectors.splice(k, 1); if (S.faceMode === s.id) setFaceMode(null); if (S.activeSel === s.id) S.activeSel = L.selectors[0]?.id ?? null; changed(); };
     head.append(desc, el('label', { cls: 'small', title: 'Invert this condition' }, inv, ' invert'), del);
-    head.onclick = (e) => { if (e.target.tagName === 'SELECT') return; if (S.activeSel !== s.id) { S.activeSel = s.id; if (S.faceMode && S.faceMode !== s.id) setFaceMode(null); renderSelectors(); drawHistogram(); updateFaceOverlay(); } };
+    head.onclick = (e) => { if (e.target.tagName === 'SELECT') return; if (S.activeSel !== s.id) { S.activeSel = s.id; if (S.faceMode && S.faceMode !== s.id) setFaceMode(null); if (S.paintMode && S.paintMode !== s.id) setPaintMode(null); renderSelectors(); drawHistogram(); updateFaceOverlay(); } };
     card.append(head);
-    if (s.id === S.activeSel) card.append(s.kind === 'faces' ? facesBody(s, desc) : valueBody(s, desc));
+    if (s.id === S.activeSel) card.append(s.kind === 'faces' ? facesBody(s, desc) : s.kind === 'paint' ? paintBody(s, desc) : valueBody(s, desc));
     box.append(card);
   });
   updateFaceOverlay();
@@ -424,16 +439,115 @@ function renderSelectors() {
 function valueBody(s, desc) {
   const upd = (full) => { desc.textContent = describeSelector(s); changed(full); };
   const g = el('div', { cls: 'grid' });
-  g.append(el('label', {}, 'Select by'), selectInput(channelOptions(true), s.source, v => { s.source = v; upd(true); }));
+  const t = S.editing, grp = otherMaps(t), maps = [['self', `this texture (${MAP_NAMES[t.role] || t.role})`]];
+  if (grp) for (const r of ['albedo', 'spec', 'normal']) if (grp.tex[r] && grp.tex[r] !== t) maps.push([r, `the ${MAP_NAMES[r]} map · ${grp.tex[r].info.name}`]);
+  if (isCross(s) && !maps.some(([v]) => v === s.map)) maps.push([s.map, `the ${MAP_NAMES[s.map] || s.map} map (this material has none)`]);
+  if (maps.length > 1) g.append(el('label', {}, 'Read from'), selectInput(maps, s.map || 'self', v => { s.map = v; upd(true); }));
+  const sem = isCross(s) && grp?.tex[s.map] ? semanticsFor(s.map, grp.prm) : t.sem;
+  g.append(el('label', {}, 'Select by'), selectInput(channelOptions(true, sem), s.source, v => { s.source = v; upd(true); }));
   g.append(el('label', {}, 'Region'), selectInput([['above', 'At or above'], ['below', 'At or below'], ['between', 'Between']], s.mode, v => { s.mode = v; upd(true); }));
   g.append(el('label', {}, s.mode === 'between' ? 'Lower' : 'Threshold'), sliderRow(0, 255, 1, s.lo, v => { s.lo = v; upd(false); }));
   if (s.mode === 'between') g.append(el('label', {}, 'Upper'), sliderRow(0, 255, 1, s.hi, v => { s.hi = v; upd(false); }));
   g.append(el('label', {}, 'Soft edge'), sliderRow(0, 255, 1, s.soft, v => { s.soft = v; upd(false); }));
   g.append(el('label', {}, 'Edge curve'), selectInput(Object.entries(CURVES), s.curve, v => { s.curve = v; upd(true); }));
   const from = el('input', { type: 'checkbox' }); from.checked = s.from === 'current'; from.onchange = () => { s.from = from.checked ? 'current' : 'original'; upd(true); };
-  g.append(el('label', {}, 'Source'), el('label', { cls: 'small' }, from, ' the result of the layers above (not the original)'));
+  g.append(el('label', {}, 'Source'), el('label', { cls: 'small' }, from, isCross(s) ? ' that map\'s edited result (not its original)' : ' the result of the layers above (not the original)'));
   return g;
 }
+// ---- painted conditions: a brush on the 2D texture view; the weights travel as a PNG in the layer ----
+S.paintMode = null; S.brush = { size: 0, soft: 0.5 };   // size in texture pixels (0: not chosen yet)
+const paintCache = new Map();   // selector id -> { src (the PNG it came from), w, h, mask: Float32Array, loading }
+function paintMask(s, w, h) {
+  const c = paintCache.get(s.id);
+  if (c && c.src === s.mask && c.w === w && c.h === h) return c.mask;
+  const e = { src: s.mask, w, h, mask: new Float32Array(w * h), loading: !!s.mask };
+  paintCache.set(s.id, e);
+  if (s.mask) {   // decode the PNG, then show it
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, w, h);
+      const d = cx.getImageData(0, 0, w, h).data; for (let p = 0; p < w * h; p++) e.mask[p] = d[p * 4] / 255;
+      e.loading = false;
+      for (const t of S.textures.values()) if (t.layers.some(l => l.selectors.some(x => x.id === s.id))) { if (t === S.editing) recompute(); else { reevaluate(t); for (const g of t.users) rebake(g, t); } }
+    };
+    img.src = s.mask;
+  }
+  return e.mask;
+}
+function savePaint(s) {
+  const e = paintCache.get(s.id); if (!e) return;
+  let any = false; for (let p = 0; p < e.mask.length && !any; p++) any = e.mask[p] > 0;
+  if (!any) { s.mask = null; e.src = null; return; }
+  const cv = document.createElement('canvas'); cv.width = e.w; cv.height = e.h; const cx = cv.getContext('2d'), img = cx.createImageData(e.w, e.h), d = img.data;
+  for (let p = 0; p < e.mask.length; p++) { const v = Math.round(e.mask[p] * 255); d[p * 4] = d[p * 4 + 1] = d[p * 4 + 2] = v; d[p * 4 + 3] = 255; }
+  cx.putImageData(img, 0, 0); s.mask = cv.toDataURL('image/png'); e.src = s.mask;
+}
+function setPaintMode(id) {
+  S.paintMode = id;
+  if (id) setFaceMode(null);
+  $('tex2d').style.cursor = id ? 'crosshair' : '';
+  if (layer()) renderSelectors();
+  blit2d();
+}
+function paintBody(s, desc) {
+  const t = S.editing, g = el('div', { cls: 'grid' });
+  if (!S.brush.size) S.brush.size = Math.max(2, Math.round(Math.max(t.width, t.height) / 32));
+  const on = S.paintMode === s.id;
+  const btn = el('button', { cls: on ? 'on' : '' }, on ? 'Painting… (click to stop)' : 'Paint on the texture image');
+  btn.onclick = () => setPaintMode(on ? null : s.id);
+  g.append(el('span'), btn);
+  g.append(el('label', {}, 'Brush size'), sliderRow(1, Math.max(8, Math.round(Math.max(t.width, t.height) / 4)), 1, S.brush.size, v => { S.brush.size = v; blit2d(); }));
+  g.append(el('label', {}, 'Soft edge'), sliderRow(0, 1, 0.05, S.brush.soft, v => { S.brush.soft = v; }));
+  const clear = el('button', {}, 'Clear'); clear.onclick = () => { const e = paintCache.get(s.id); if (e) e.mask.fill(0); s.mask = null; if (e) e.src = null; desc.textContent = describeSelector(s); changed(true); };
+  g.append(el('span'), clear);
+  g.append(el('span'), el('div', { cls: 'small dim' }, 'In the texture view below: left button paints, right button (or Ctrl) erases. The brush is in texture pixels.'));
+  return g;
+}
+// One brush stamp into the active paint condition's weights, at texture pixel (x, y).
+function stamp(e, x, y, erase) {
+  const r = Math.max(.5, S.brush.size / 2), soft = S.brush.soft, w = e.w, h = e.h;
+  const x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(w - 1, Math.ceil(x + r)), y0 = Math.max(0, Math.floor(y - r)), y1 = Math.min(h - 1, Math.ceil(y + r));
+  for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) {
+    const d = Math.hypot(px + .5 - x, py + .5 - y) / r; if (d > 1) continue;
+    const wt = soft <= 0 ? 1 : Math.min(1, (1 - d) / soft);
+    const p = py * w + px;
+    e.mask[p] = erase ? e.mask[p] * (1 - wt) : Math.max(e.mask[p], wt);
+  }
+}
+let stroke = null;   // { s, e, last: [x, y], erase }
+function paintCoord(ev) {
+  const c = $('tex2d'), r = c.getBoundingClientRect();
+  const x = (ev.clientX - r.left) * c.width / r.width, y = (ev.clientY - r.top) * c.height / r.height;
+  return [(x - view2d.ox) / view2d.sc, (y - view2d.oy) / view2d.sc];
+}
+function activePaint() { const s = activeSelector(); return S.editing && S.paintMode && s && s.kind === 'paint' && s.id === S.paintMode ? s : null; }
+$('tex2d').oncontextmenu = (ev) => { if (activePaint()) ev.preventDefault(); };
+$('tex2d').onpointerdown = (ev) => {
+  const s = activePaint(); if (!s) return;
+  ev.preventDefault(); $('tex2d').setPointerCapture(ev.pointerId);
+  const t = S.editing, e = (paintMask(s, t.width, t.height), paintCache.get(s.id));
+  const [x, y] = paintCoord(ev);
+  stroke = { s, e, last: [x, y], erase: ev.button === 2 || ev.ctrlKey };
+  stamp(e, x, y, stroke.erase); recompute();
+};
+$('tex2d').onpointermove = (ev) => {
+  if (!activePaint()) return;
+  const [x, y] = paintCoord(ev);
+  if (stroke) {
+    const [lx, ly] = stroke.last, dist = Math.hypot(x - lx, y - ly), step = Math.max(.5, S.brush.size / 6), n = Math.ceil(dist / step);
+    for (let i = 1; i <= n; i++) stamp(stroke.e, lx + (x - lx) * i / n, ly + (y - ly) * i / n, stroke.erase);
+    stroke.last = [x, y]; recompute();
+  } else blit2d([x, y]);
+};
+$('tex2d').onpointerup = $('tex2d').onpointercancel = (ev) => {
+  if (!stroke) return;
+  const { s } = stroke; stroke = null;
+  savePaint(s);
+  const desc = document.querySelector('.selcard.active .desc'); if (desc) desc.textContent = describeSelector(s);
+  changed(true);   // one undo step per stroke
+};
+$('tex2d').onpointerleave = () => { if (!stroke) blit2d(); };
+
 function facesBody(s, desc) {
   const upd = (full) => { desc.textContent = describeSelector(s); bumpFaces(s); changed(full); };
   const g = el('div', { cls: 'grid' });
@@ -455,6 +569,7 @@ function facesBody(s, desc) {
 const faceVersions = new WeakMap(), faceCache = new Map();
 function bumpFaces(s) { faceVersions.set(s, (faceVersions.get(s) || 0) + 1); }
 function faceMask(s, w, h) {
+  if (s.kind === 'paint') return paintMask(s, w, h);
   const key = `${w}x${h}|${s.grow}|${s.feather}|${s.uv.length}|${faceVersions.get(s) || 0}`;
   const hit = faceCache.get(s.id); if (hit && hit.key === key) return hit.mask;
   const a = document.createElement('canvas'); a.width = w; a.height = h;
@@ -479,6 +594,7 @@ function allMeshes() { return S.groups.flatMap(g => g.meshes); }
 
 function setFaceMode(id) {
   S.faceMode = id;
+  if (id && S.paintMode) { S.paintMode = null; $('tex2d').style.cursor = ''; }
   $('viewport').classList.toggle('picking', !!id); $('faceHelp').hidden = !id;
   controls.mouseButtons = id ? { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   if (id && S.mode === 'path') document.querySelector('#renderMode button[data-v=raster]').click();
@@ -632,9 +748,13 @@ function recompute() {
   requestAnimationFrame(() => {
     pending = false;
     const t = S.editing; if (!t) return;
-    const r = evaluate(t.original, t.layers, t.width, t.height, faceMask, S.selectedLayer);
+    const r = evaluate(t.original, t.layers, t.width, t.height, faceMask, S.selectedLayer, mapSourceFor(t));
     t.edited = r.pixels; t.mask = S.showMask ? r.mask : null;
-    for (const g of t.users) rebake(g, t);
+    for (const g of t.users) {
+      let others = false;
+      for (const o of Object.values(g.tex)) if (o !== t && hasCrossMap(o.layers)) { reevaluate(o); others = true; }
+      rebake(g, others ? null : t);
+    }
     if (S.mode === 'path') { pathTracer.updateMaterials(); pathTracer.reset(); }
     draw2d(); drawHistogram();
   });
@@ -642,6 +762,7 @@ function recompute() {
 
 // ------------------------------------------------------------------ 2D texture + histogram
 const off = document.createElement('canvas');
+const view2d = { sc: 1, ox: 0, oy: 0 };   // how the texture is fitted in the 2D view (for the brush)
 function draw2d() {
   const t = S.editing; if (!t) return;
   off.width = t.width; off.height = t.height;
@@ -654,16 +775,27 @@ function draw2d() {
     d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
-  const c = $('tex2d'), cx = c.getContext('2d'); cx.fillStyle = '#0d0f11'; cx.fillRect(0, 0, c.width, c.height);
+  blit2d();
+}
+// The composed texture onto the 2D view, with the brush outline at `cursor` (texture pixels) while painting.
+function blit2d(cursor = null) {
+  const t = S.editing, c = $('tex2d'), cx = c.getContext('2d'); if (!t || !off.width) return;
+  cx.fillStyle = '#0d0f11'; cx.fillRect(0, 0, c.width, c.height);
   const sc = Math.min(c.width / t.width, c.height / t.height), w = t.width * sc, h = t.height * sc;
-  cx.imageSmoothingQuality = 'high'; cx.drawImage(off, (c.width - w) / 2, (c.height - h) / 2, w, h);
+  view2d.sc = sc; view2d.ox = (c.width - w) / 2; view2d.oy = (c.height - h) / 2;
+  cx.imageSmoothingQuality = 'high'; cx.drawImage(off, view2d.ox, view2d.oy, w, h);
+  if (cursor && activePaint()) {
+    cx.strokeStyle = '#fff'; cx.lineWidth = 1; cx.beginPath(); cx.arc(view2d.ox + cursor[0] * sc, view2d.oy + cursor[1] * sc, Math.max(1, S.brush.size / 2 * sc), 0, Math.PI * 2); cx.stroke();
+    cx.strokeStyle = '#000'; cx.beginPath(); cx.arc(view2d.ox + cursor[0] * sc, view2d.oy + cursor[1] * sc, Math.max(1, S.brush.size / 2 * sc) + 1, 0, Math.PI * 2); cx.stroke();
+  }
 }
 function drawHistogram() {
   const L = layer(), s = activeSelector(), c = $('histogram'), cx = c.getContext('2d'), W = c.width, H = c.height;
   c.hidden = !s || s.kind !== 'value';
   cx.fillStyle = '#0d0f11'; cx.fillRect(0, 0, W, H);
   if (c.hidden) return;
-  const t = S.editing, src = s.from === 'current' ? evaluate(t.original, t.layers.slice(0, t.layers.indexOf(L)), t.width, t.height, faceMask).pixels : t.original;
+  const t = S.editing, other = isCross(s) ? mapSourceFor(t)(s) : null;
+  const src = other ? other.px : other === undefined ? new Uint8ClampedArray(4) : s.from === 'current' ? evaluate(t.original, t.layers.slice(0, t.layers.indexOf(L)), t.width, t.height, faceMask, null, mapSourceFor(t)).pixels : t.original;
   const h = histogram(src, s.source); let max = 1; for (const v of h) max = Math.max(max, Math.log1p(v));
   cx.fillStyle = '#5a6470';
   for (let v = 0; v < 256; v++) { const bh = Math.log1p(h[v]) / max * (H - 14); cx.fillRect(v / 256 * W, H - 12 - bh, W / 256 + .5, bh); }

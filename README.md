@@ -25,8 +25,8 @@ list; change it under **Game** if yours is elsewhere.
     A light power;
   - albedo times vertex colour times `lerp(g_DiffuseMapColor*Power, g_SpecularMapColor*Power, G)`.
 - **Renderers**: Raster (three.js, environment lighting through PMREM) or Path traced
-  (three-gpu-pathtracer, progressive). The "Dark room · glowing sacs" preset places emissive
-  spheres that the path tracer treats as real lights (soft reflections included).
+  (three-gpu-pathtracer, progressive). Lighting presets include a dark room lit only by emissive
+  spheres, which the path tracer treats as real lights.
 - **Views**: lit, base colour, roughness, metalness, non-metal reflectance and normal map.
 
 ## Layers
@@ -37,20 +37,28 @@ A texture's result is always recomputed from the original pixels, top layer firs
 - **Where**: a list of conditions, each with its own **invert**, joined top to bottom by **and**
   (the smaller weight) or **or** (the larger). No conditions: the whole texture.
   - **Value**: a channel (or brightness) at or above / at or below a threshold, or between two.
-    The **soft edge** ramps the effect in over that many values on the near side of the threshold,
-    shaped by the **edge curve** (linear, S-curve, log, exp), so a pixel at 99 is changed almost as
-    much as one at 100 when the threshold is 100. The histogram shows the active value condition's
-    channel and its curve; click sets the threshold, shift-click the upper limit.
+    **Read from** picks the map the values come from: this texture, or another map of the same
+    material (the albedo, specular or normal map), sampled at this texture's pixels. So a specular
+    map can be changed where the albedo is bright, or where the normal map's green channel is
+    low, in any combination. The **soft edge** ramps the effect in over that many values on the
+    near side of the threshold, shaped by the **edge curve** (linear, S-curve, log, exp), so a
+    pixel at 99 is changed almost as much as one at 100 when the threshold is 100. The histogram
+    shows the chosen map's channel and the curve; click sets the threshold, shift-click the upper
+    limit.
   - **Faces**: "Pick faces on the model", then click a face (shift adds, ctrl removes) or drag a box
     (only faces the camera sees, unless "include faces hidden behind others" is on). Right-drag
     orbits while picking; Esc ends it. The condition is the texture area under the picked faces,
     stored as their UV triangles (so it works without the model), with **grow** and **feather** in
     pixels. Mirrored parts that share that texture area are included.
+  - **Paint**: "Paint on the texture image", then paint in the 2D texture view with a round brush
+    (size in texture pixels, soft edge); the right button or Ctrl erases. The painted weights are
+    kept in the layer as a small PNG. Each stroke is one undo step.
 - A value condition selects from the original texture by default, so deleting or disabling any
-  layer never changes what the others select; it can instead read the result of the layers above.
+  layer never changes what the others select; it can instead read the result of the layers above
+  (or, for another map, that map's edited result).
 - **Undo / redo**: Ctrl+Z, Ctrl+Shift+Z (or Ctrl+Y), or the arrows by "+ Layer": every change,
-  face picks included; a run of slider drags is one step. Each texture keeps its history while
-  its model is open.
+  face picks and brush strokes included; a run of slider drags is one step. Each texture keeps its
+  history while its model is open.
 - "Show the selected layer's region" paints it magenta in the 2D view and on the model; the
   active faces condition's own faces are orange (blue when inverted).
 
@@ -65,16 +73,17 @@ Edits live in a **project**: a folder you choose (there is no default). **New…
 The project file records the game folder, the models you opened (the Project panel lists them;
 opening a project reopens the last one) and every edited texture's layers, saved as you change
 them. **Open…** lists recent projects, most recently edited first, with their last edit time and
-texture counts, or browses for a folder with a project file. Changing the
-game folder while a project is open changes that project's install.
+texture counts, or browses for a folder with a project file. Changing the game folder while a
+project is open changes that project's install. Closing the app with a project open reopens it,
+and its last model, next time.
 
 **Export** writes the edited texture into the project folder as an uncompressed RGBA8 DDS with
-mips, named `<id>.dds` for every id the game may give the original texture: a 64-bit hash of its
-size, DXGI format and top mip, for the typeless, unorm and sRGB variants of the format. That is the
-runtime texture-override format of the author's DSR lighting mod, whose DLL hot-reloads such files
-from its `texture_overrides\game` folder; a project made there is live in game. **Remove export**
-deletes the files (the layers stay). A texture whose layers changed after its export shows
-"export outdated".
+mips, one file per id the game may give the original texture: `<id>.dds`, where the id is a 64-bit
+hash of the texture's size, DXGI format and top mip, for the typeless, unorm and sRGB variants of
+its format. Mods that replace textures at runtime by content hash can load these files directly
+(the hash function is in `src/Dds.cs`); otherwise convert the DDS files for your own packing tool.
+**Remove export** deletes the files (the layers stay). A texture whose layers changed after its
+export shows "export outdated".
 
 Per-user settings (the default game folder, recent projects, the window position) are in
 `%APPDATA%\DSR Texture Editor\settings.json`.

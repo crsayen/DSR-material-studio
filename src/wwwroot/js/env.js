@@ -1,5 +1,5 @@
 // Lighting presets: an equirectangular environment (lights the raster view through PMREM and the
-// path tracer directly) plus optional emissive objects (the glowing sacs) that both renderers see.
+// path tracer directly) plus optional emissive objects (glowing spheres) that both renderers see.
 import * as THREE from 'three';
 
 function equirect(w, h, fn) {
@@ -54,8 +54,8 @@ export const PRESETS = {
       });
     },
   },
-  sacs: {
-    label: 'Dark room · glowing sacs',
+  emissive: {
+    label: 'Dark room · glowing spheres',
     env: () => equirect(256, 128, () => [.002, .0015, .0012]),
     // Glowing spheres around the model: real emitters in the path tracer, and point lights plus a
     // reflection probe in the raster view.

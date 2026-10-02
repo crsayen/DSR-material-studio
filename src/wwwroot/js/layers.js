@@ -5,8 +5,10 @@
 // A layer's "where" is a list of conditions, each with its own invert, combined top to bottom
 // with AND (the smaller weight) or OR (the larger):
 //   value: a channel (or brightness) above / below / between thresholds, with a soft edge whose
-//          width and curve are adjustable;
-//   faces: faces picked on the model, as the texture area their UVs cover (grown / feathered).
+//          width and curve are adjustable; read from this texture or from another map of the same
+//          material (the albedo, specular or normal map), sampled at this texture's pixels;
+//   faces: faces picked on the model, as the texture area their UVs cover (grown / feathered);
+//   paint: an area painted on the texture with a brush, kept as a PNG (data URL) of the weights.
 // No conditions: the whole texture.
 
 export const CURVES = { linear: 'Linear', smooth: 'S-curve', log: 'Log (fast start)', exp: 'Exp (slow start)' };
@@ -17,7 +19,8 @@ const uid = (p) => p + Date.now().toString(36) + (nextId++);
 export function newSelector(kind, over = {}) {
   const base = { id: uid('S'), kind, combine: 'and', invert: false };
   if (kind === 'faces') return { ...base, model: null, faces: {}, uv: [], grow: 2, feather: 0, hidden: false, ...over };
-  return { ...base, source: 'g', mode: 'above', lo: 128, hi: 255, soft: 16, curve: 'smooth', from: 'original', ...over };
+  if (kind === 'paint') return { ...base, mask: null, ...over };
+  return { ...base, map: 'self', source: 'g', mode: 'above', lo: 128, hi: 255, soft: 16, curve: 'smooth', from: 'original', ...over };
 }
 
 export function newLayer(over = {}) {
@@ -61,17 +64,28 @@ function sourceValue(px, i, source) {
   return px[i + channel[source]];
 }
 
+export const isCross = (sel) => sel.kind === 'value' && !!sel.map && sel.map !== 'self';
+export const hasCrossMap = (layers) => layers.some(l => l.selectors.some(isCross));
+
 // The weight of every pixel for one layer (Float32Array), reading `cur` for conditions that select
-// from the result so far. faceMask(sel, w, h) supplies a faces condition's coverage.
-function layerWeights(layer, original, cur, w, h, faceMask) {
+// from the result so far. faceMask(sel, w, h) supplies a faces or paint condition's weights; mapSource(sel)
+// the pixels of another map of the material ({ px, w, h }, sampled at this texture's pixels when
+// the sizes differ), null for this texture, undefined when the material has no such map.
+function layerWeights(layer, original, cur, w, h, faceMask, mapSource) {
   const n = w * h, out = new Float32Array(n).fill(1);
   layer.selectors.forEach((sel, k) => {
     let get;
-    if (sel.kind === 'faces') { const m = faceMask(sel, w, h); get = (p) => m ? m[p] : 0; }
+    if (sel.kind === 'faces' || sel.kind === 'paint') { const m = faceMask(sel, w, h); get = (p) => m ? m[p] : 0; }
     else {
       const lut = new Float32Array(256); for (let v = 0; v < 256; v++) lut[v] = valueWeight(sel, v);
-      const src = sel.from === 'current' ? cur : original;
-      get = (p) => lut[sourceValue(src, p * 4, sel.source)];
+      let src = sel.from === 'current' ? cur : original, sw = w, sh = h;
+      const other = isCross(sel) ? (mapSource ? mapSource(sel) : undefined) : null;
+      if (other === undefined) get = () => 0;   // no such map: nothing selected
+      else {
+        if (other) { src = other.px; sw = other.w; sh = other.h; }
+        if (sw === w && sh === h) get = (p) => lut[sourceValue(src, p * 4, sel.source)];
+        else get = (p) => { const x = Math.floor((p % w + .5) * sw / w), y = Math.floor((Math.floor(p / w) + .5) * sh / h); return lut[sourceValue(src, (y * sw + x) * 4, sel.source)]; };
+      }
     }
     const or = k > 0 && sel.combine === 'or';
     for (let p = 0; p < n; p++) {
@@ -83,13 +97,13 @@ function layerWeights(layer, original, cur, w, h, faceMask) {
 }
 
 // original: RGBA bytes. Returns { pixels (Uint8ClampedArray), mask: weights of `maskLayerId` or null }.
-export function evaluate(original, layers, w, h, faceMask, maskLayerId = null) {
+export function evaluate(original, layers, w, h, faceMask, maskLayerId = null, mapSource = null) {
   const cur = new Uint8ClampedArray(original);
   let mask = null;
   for (const layer of layers) {
     const wantMask = layer.id === maskLayerId;
     if (!layer.enabled && !wantMask) continue;
-    const weights = layerWeights(layer, original, cur, w, h, faceMask);
+    const weights = layerWeights(layer, original, cur, w, h, faceMask, mapSource);
     if (wantMask) mask = weights;
     if (!layer.enabled) continue;
     const tg = layer.target === 'rgb' ? [0, 1, 2] : [channel[layer.target]], amt = layer.amount;
@@ -111,12 +125,15 @@ export function histogram(px, source) {
 }
 
 const TN = { r: 'R', g: 'G', b: 'B', a: 'A', rgb: 'RGB', luma: 'brightness' };
+export const MAP_NAMES = { albedo: 'albedo', spec: 'specular', normal: 'normal' };
 export function describeSelector(s) {
+  if (s.kind === 'paint') return `${s.invert ? 'not ' : ''}painted area${s.mask ? '' : ' (nothing painted yet)'}`;
   if (s.kind === 'faces') {
     const n = Object.values(s.faces || {}).reduce((a, f) => a + f.length, 0) || s.uv.length / 6;
     return `${s.invert ? 'not ' : ''}${n} picked face${n === 1 ? '' : 's'}`;
   }
-  const where = s.mode === 'above' ? `${TN[s.source]} ≥ ${s.lo}` : s.mode === 'below' ? `${TN[s.source]} ≤ ${s.lo}` : `${s.lo} ≤ ${TN[s.source]} ≤ ${s.hi}`;
+  const ch = (isCross(s) ? (MAP_NAMES[s.map] || s.map) + ' ' : '') + TN[s.source];
+  const where = s.mode === 'above' ? `${ch} ≥ ${s.lo}` : s.mode === 'below' ? `${ch} ≤ ${s.lo}` : `${s.lo} ≤ ${ch} ≤ ${s.hi}`;
   return `${s.invert ? 'not ' : ''}${where}${s.soft > 0 ? ` (soft ${s.soft})` : ''}`;
 }
 export function describe(layer) {
