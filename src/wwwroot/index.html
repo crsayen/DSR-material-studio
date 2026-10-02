@@ -29,7 +29,7 @@
       <div id="gameInfo" class="small"></div>
       <details class="small"><summary>Search order</summary><ol id="searchOrder" class="small dim"></ol></details>
     </section>
-    <section>
+    <section id="modelSection">
       <h2>Model</h2>
       <input id="modelSearch" type="search" placeholder="Search, e.g. 9550 or BD_A" autocomplete="off">
       <div class="row small">
@@ -75,7 +75,7 @@
         <div id="texInfo" class="small dim"></div>
         <div id="channelLegend" class="small"></div>
       </section>
-      <section>
+      <section id="layersSection">
         <div class="row between"><h3>Layers</h3>
           <span><button id="undoBtn" disabled>↶</button> <button id="redoBtn" disabled>↷</button> <button id="addLayer" title="Add a layer">+ Layer</button></span></div>
         <ol id="layers" class="layers"></ol>
@@ -96,7 +96,7 @@
         <canvas id="histogram" width="340" height="110" title="Histogram of the active value condition's channel (white: how strongly each value is selected). Click: set the threshold; shift-click: the upper limit."></canvas>
         <div id="layerSummary" class="small dim"></div>
       </section>
-      <section>
+      <section id="texSection">
         <div class="row between"><h3>Texture</h3>
           <span class="seg small" id="chanView"><button data-v="rgb" class="on">RGB</button><button data-v="r">R</button><button data-v="g">G</button><button data-v="b">B</button><button data-v="a">A</button></span></div>
         <label class="small"><input id="showMask" type="checkbox" checked> Show the selected layer's region (magenta), here and on the model</label>
@@ -124,11 +124,11 @@
           <span></span><div id="mtdEmissionOut" class="small dim"></div>
         </div>
       </section>
-      <section>
+      <section id="mtdParamsSection">
         <div class="row between"><h3>Parameters</h3><span><select id="mtdAddParam" class="small"></select> <button id="mtdAddParamBtn" title="Add the chosen parameter">+ Add</button></span></div>
         <div id="mtdParams"></div>
       </section>
-      <section>
+      <section id="mtdTexSection">
         <div class="row between"><h3>Texture slots</h3><span><select id="mtdAddTex" class="small"></select> <button id="mtdAddTexBtn" title="Add the chosen slot">+ Add</button></span></div>
         <div id="mtdTextures"></div>
         <div class="small dim">The model's FLVER material supplies the texture for each slot by name; the slot says which UV set and sampler register it uses.</div>

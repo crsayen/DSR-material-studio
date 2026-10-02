@@ -18,8 +18,25 @@ namespace TextureEditor
             Application.EnableVisualStyles();
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.SetCompatibleTextRenderingDefault(false);
-            var f = new Form { Text = "DSR Texture Editor", StartPosition = FormStartPosition.CenterScreen, Width = 1600, Height = 960, MinimumSize = new System.Drawing.Size(960, 600) };
+            var f = new Form { Text = "DSR Texture Editor", StartPosition = FormStartPosition.CenterScreen };
             try { f.Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath); } catch { }
+            // The page is laid out to fit the window without scrolling down to about 1100 x 760 CSS pixels,
+            // so the window cannot shrink below that (in device pixels at the monitor's scale).
+            static System.Drawing.Size Css(int w, int h, int dpi) => new((int)Math.Round(w * dpi / 96.0), (int)Math.Round(h * dpi / 96.0));
+            f.HandleCreated += (_, _) =>
+            {
+                int dpi = f.DeviceDpi;
+                f.MinimumSize = Css(1100, 760, dpi);
+                if (settings.Window == null)
+                {
+                    var area = Screen.FromControl(f).WorkingArea;
+                    var want = Css(1500, 900, dpi);
+                    f.StartPosition = FormStartPosition.Manual;
+                    f.Size = new System.Drawing.Size(Math.Min(want.Width, area.Width), Math.Min(want.Height, area.Height));
+                    f.Location = new System.Drawing.Point(area.Left + (area.Width - f.Width) / 2, area.Top + (area.Height - f.Height) / 2);
+                }
+            };
+            f.DpiChanged += (_, e) => f.MinimumSize = Css(1100, 760, e.DeviceDpiNew);
             RestoreBounds(f, settings);
             var view = new WebView2 { Dock = DockStyle.Fill };
             f.Controls.Add(view);

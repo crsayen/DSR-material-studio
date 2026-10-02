@@ -3,9 +3,19 @@
   --accent: #e0a24a; --accent2: #c64fd0; --on: #3a4048;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; }
-#app { display: grid; grid-template-columns: 290px 1fr 370px; height: 100vh; }
-aside { background: var(--panel); overflow-y: auto; border-right: 1px solid var(--line); }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; }
+/* The page never scrolls: the columns are fixed-height flex stacks whose lists and forms scroll inside. */
+#app { display: grid; grid-template-columns: 290px minmax(0, 1fr) 370px; grid-template-rows: 100%; height: 100vh; }
+aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+aside > * { flex: 0 0 auto; min-height: 0; }
+#projectModels { max-height: 18vh; }
+#modelSection { flex: 1 1 200px; min-height: 200px; display: flex; flex-direction: column; } #modelList { flex: 1 1 60px; min-height: 60px; max-height: none; }
+#materialsSection { flex: 0 1 auto; max-height: 34%; overflow-y: auto; }
+#editor, #mtdEditor { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; } #editor > *, #mtdEditor > * { flex: 0 0 auto; min-height: 0; }
+#layers { max-height: 18vh; overflow-y: auto; }
+#layerForm { flex: 1 1 140px; min-height: 140px; overflow-y: auto; }
+#tex2d { width: min(100%, 30vh); aspect-ratio: 1; height: auto; display: block; margin: 6px auto 0; }
+#mtdParamsSection { flex: 1 1 120px; min-height: 120px; overflow-y: auto; } #mtdTexSection { flex: 0 1 auto; max-height: 30%; overflow-y: auto; }
 #right { border-right: 0; border-left: 1px solid var(--line); }
 section { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 h2 { font-size: 14px; margin: 0 0 6px; }
@@ -44,8 +54,7 @@ ol.layers li.on { border-color: var(--accent); background: #2a251d; }
 ol.layers li.off .what { opacity: .45; text-decoration: line-through; }
 ol.layers li .what { font-size: 12px; } ol.layers li .what b { display: block; font-weight: 600; }
 ol.layers li .tools button { padding: 0 5px; font-size: 11px; }
-#histogram, #tex2d { width: 100%; background: #0d0f11; border: 1px solid var(--line); border-radius: 4px; margin-top: 6px; image-rendering: auto; }
-#tex2d { aspect-ratio: 1; height: auto; }
+#histogram { width: 100%; } #histogram, #tex2d { background: #0d0f11; border: 1px solid var(--line); border-radius: 4px; margin-top: 6px; image-rendering: auto; }
 #channelLegend { margin-top: 4px; } #channelLegend span { display: inline-block; margin-right: 8px; }
 #saveState { margin-top: 6px; }
 .unsaved { color: var(--accent); } .ok { color: #9fd08a; } .err { color: #f08a7a; }
